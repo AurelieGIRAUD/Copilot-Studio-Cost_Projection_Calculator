@@ -295,7 +295,7 @@ const CopilotCostCalculator: React.FC = () => {
               label={{ value: 'Month', position: 'insideBottom', offset: -10 }}
             />
             <YAxis
-              label={{ value: 'Cost ($)', angle: -90, position: 'insideLeft', offset: 10 }}
+              label={{ value: 'Cost ($)', angle: -90, position: 'insideLeft', offset: 20 }}
             />
             <Tooltip
               formatter={(value: number) => formatCurrency(value)}
@@ -358,7 +358,7 @@ const CopilotCostCalculator: React.FC = () => {
               label={{ value: 'Month', position: 'insideBottom', offset: -10 }}
             />
             <YAxis
-              label={{ value: 'Active Users', angle: -90, position: 'insideLeft', offset: 10 }}
+              label={{ value: 'Active Users', angle: -90, position: 'insideLeft', offset: 20 }}
             />
             <Tooltip
               labelFormatter={(month: number) => `Month ${month}`}
