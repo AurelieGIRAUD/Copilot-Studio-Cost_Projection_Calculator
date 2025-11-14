@@ -1,36 +1,62 @@
-import React, { useState, useMemo } from 'react';
-import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import React, { useState, useMemo, ChangeEvent } from 'react';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
-const CopilotCostCalculator = () => {
-  const [userCount, setUserCount] = useState(1300);
+// Type definitions
+interface MonthlyData {
+  month: number;
+  year: string;
+  adoption: number;
+  activeUsers: number;
+  totalCredits: number;
+  paygCost: number;
+  packCost: number;
+  m365Cost: number;
+  savings: number;
+}
+
+interface ScenarioData {
+  users: number;
+  agents: number;
+  ratio: string;
+  activeUsers: number;
+  creditsPerUserMonth: number;
+  monthlyPayg: number;
+  yearlyPayg: number;
+  yearlyM365: number;
+  savings: number;
+  savingsPercent: number;
+}
+
+const CopilotCostCalculator: React.FC = () => {
+  const [userCount, setUserCount] = useState<number>(1300);
   // Note: agentCount is used for scenario categorization in the comparison table
   // Future enhancement: could factor agent count into credit consumption calculations
-  const [agentCount, setAgentCount] = useState(10);
-  const [complexityRatio, setComplexityRatio] = useState('80/20');
-  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [agentCount, setAgentCount] = useState<number>(10);
+  const [complexityRatio, setComplexityRatio] = useState<string>('80/20');
+  const [showAdvanced, setShowAdvanced] = useState<boolean>(false);
 
   // Advanced settings
-  const [simpleCreditsPerUser, setSimpleCreditsPerUser] = useState(75);
-  const [complexCreditsPerUser, setComplexCreditsPerUser] = useState(600);
-  const [year1GrowthRate, setYear1GrowthRate] = useState(15);
-  const [adoptionCeiling, setAdoptionCeiling] = useState(80);
-  const [steadyStateAdoption, setSteadyStateAdoption] = useState(60); // For scenario comparison
+  const [simpleCreditsPerUser, setSimpleCreditsPerUser] = useState<number>(75);
+  const [complexCreditsPerUser, setComplexCreditsPerUser] = useState<number>(600);
+  const [year1GrowthRate, setYear1GrowthRate] = useState<number>(15);
+  const [adoptionCeiling, setAdoptionCeiling] = useState<number>(80);
+  const [steadyStateAdoption, setSteadyStateAdoption] = useState<number>(60); // For scenario comparison
 
-  const userScenarios = [1300, 5000, 30000];
-  const agentScenarios = [10, 30, 100];
-  const complexityScenarios = ['80/20', '70/30', '50/50'];
+  const userScenarios: number[] = [1300, 5000, 30000];
+  const agentScenarios: number[] = [10, 30, 100];
+  const complexityScenarios: string[] = ['80/20', '70/30', '50/50'];
 
   // Constants
-  const PAYG_RATE = 0.01;
-  const PACK_COST = 200;
-  const PACK_CREDITS = 25000;
-  const M365_COPILOT_COST = 30;
-  const BREAKEVEN_CREDITS = M365_COPILOT_COST / PAYG_RATE;
+  const PAYG_RATE: number = 0.01;
+  const PACK_COST: number = 200;
+  const PACK_CREDITS: number = 25000;
+  const M365_COPILOT_COST: number = 30;
+  const BREAKEVEN_CREDITS: number = M365_COPILOT_COST / PAYG_RATE;
 
-  const calculateMonthlyData = () => {
-    const [simplePercent, complexPercent] = complexityRatio.split('/').map(n => parseInt(n) / 100);
+  const calculateMonthlyData = (): MonthlyData[] => {
+    const [simplePercent, complexPercent] = complexityRatio.split('/').map((n: string) => parseInt(n) / 100);
 
-    const data = [];
+    const data: MonthlyData[] = [];
     let currentAdoption = 10;
 
     for (let month = 1; month <= 24; month++) {
@@ -65,13 +91,13 @@ const CopilotCostCalculator = () => {
     return data;
   };
 
-  const calculateScenarioComparison = () => {
-    const results = [];
+  const calculateScenarioComparison = (): ScenarioData[] => {
+    const results: ScenarioData[] = [];
 
     for (const users of userScenarios) {
       for (const agents of agentScenarios) {
         for (const ratio of complexityScenarios) {
-          const [simplePercent, complexPercent] = ratio.split('/').map(n => parseInt(n) / 100);
+          const [simplePercent, complexPercent] = ratio.split('/').map((n: string) => parseInt(n) / 100);
 
           // Use configurable steady state adoption rate
           const activeUsers = Math.round(users * (steadyStateAdoption / 100));
@@ -110,12 +136,12 @@ const CopilotCostCalculator = () => {
     simpleCreditsPerUser, complexCreditsPerUser, steadyStateAdoption
   ]);
 
-  const currentScenario = scenarioData.find(
-    s => s.users === userCount && s.agents === agentCount && s.ratio === complexityRatio
+  const currentScenario: ScenarioData | undefined = scenarioData.find(
+    (s: ScenarioData) => s.users === userCount && s.agents === agentCount && s.ratio === complexityRatio
   );
 
-  const formatCurrency = (value) => `$${value.toLocaleString()}`;
-  const formatNumber = (value) => value.toLocaleString();
+  const formatCurrency = (value: number): string => `$${value.toLocaleString()}`;
+  const formatNumber = (value: number): string => value.toLocaleString();
 
   return (
     <div className="w-full max-w-7xl mx-auto p-6 bg-gray-50">
@@ -142,7 +168,7 @@ const CopilotCostCalculator = () => {
             </label>
             <select
               value={userCount}
-              onChange={(e) => setUserCount(parseInt(e.target.value))}
+              onChange={(e: ChangeEvent<HTMLSelectElement>) => setUserCount(parseInt(e.target.value))}
               className="w-full p-2 border rounded-lg bg-white"
             >
               {userScenarios.map(count => (
@@ -157,7 +183,7 @@ const CopilotCostCalculator = () => {
             </label>
             <select
               value={agentCount}
-              onChange={(e) => setAgentCount(parseInt(e.target.value))}
+              onChange={(e: ChangeEvent<HTMLSelectElement>) => setAgentCount(parseInt(e.target.value))}
               className="w-full p-2 border rounded-lg bg-white"
             >
               {agentScenarios.map(count => (
@@ -172,7 +198,7 @@ const CopilotCostCalculator = () => {
             </label>
             <select
               value={complexityRatio}
-              onChange={(e) => setComplexityRatio(e.target.value)}
+              onChange={(e: ChangeEvent<HTMLSelectElement>) => setComplexityRatio(e.target.value)}
               className="w-full p-2 border rounded-lg bg-white"
             >
               {complexityScenarios.map(ratio => (
@@ -200,7 +226,7 @@ const CopilotCostCalculator = () => {
                 <input
                   type="number"
                   value={simpleCreditsPerUser}
-                  onChange={(e) => setSimpleCreditsPerUser(parseInt(e.target.value) || 0)}
+                  onChange={(e: ChangeEvent<HTMLInputElement>) => setSimpleCreditsPerUser(parseInt(e.target.value) || 0)}
                   className="w-full p-2 border rounded bg-white text-sm"
                 />
               </div>
@@ -211,7 +237,7 @@ const CopilotCostCalculator = () => {
                 <input
                   type="number"
                   value={complexCreditsPerUser}
-                  onChange={(e) => setComplexCreditsPerUser(parseInt(e.target.value) || 0)}
+                  onChange={(e: ChangeEvent<HTMLInputElement>) => setComplexCreditsPerUser(parseInt(e.target.value) || 0)}
                   className="w-full p-2 border rounded bg-white text-sm"
                 />
               </div>
@@ -222,7 +248,7 @@ const CopilotCostCalculator = () => {
                 <input
                   type="number"
                   value={year1GrowthRate}
-                  onChange={(e) => setYear1GrowthRate(parseInt(e.target.value) || 0)}
+                  onChange={(e: ChangeEvent<HTMLInputElement>) => setYear1GrowthRate(parseInt(e.target.value) || 0)}
                   className="w-full p-2 border rounded bg-white text-sm"
                 />
               </div>
@@ -233,7 +259,7 @@ const CopilotCostCalculator = () => {
                 <input
                   type="number"
                   value={adoptionCeiling}
-                  onChange={(e) => setAdoptionCeiling(parseInt(e.target.value) || 0)}
+                  onChange={(e: ChangeEvent<HTMLInputElement>) => setAdoptionCeiling(parseInt(e.target.value) || 0)}
                   className="w-full p-2 border rounded bg-white text-sm"
                 />
               </div>
@@ -246,7 +272,7 @@ const CopilotCostCalculator = () => {
                 <input
                   type="number"
                   value={steadyStateAdoption}
-                  onChange={(e) => setSteadyStateAdoption(parseInt(e.target.value) || 0)}
+                  onChange={(e: ChangeEvent<HTMLInputElement>) => setSteadyStateAdoption(parseInt(e.target.value) || 0)}
                   className="w-full p-2 border rounded bg-white text-sm"
                 />
                 <p className="text-xs text-gray-500 mt-1">
@@ -319,8 +345,8 @@ const CopilotCostCalculator = () => {
               label={{ value: 'Cost ($)', angle: -90, position: 'insideLeft' }}
             />
             <Tooltip
-              formatter={(value) => formatCurrency(value)}
-              labelFormatter={(month) => `Month ${month}`}
+              formatter={(value: number) => formatCurrency(value)}
+              labelFormatter={(month: number) => `Month ${month}`}
             />
             <Legend />
             <Line
@@ -375,7 +401,7 @@ const CopilotCostCalculator = () => {
               label={{ value: 'Active Users', angle: -90, position: 'insideLeft' }}
             />
             <Tooltip
-              labelFormatter={(month) => `Month ${month}`}
+              labelFormatter={(month: number) => `Month ${month}`}
             />
             <Legend />
             <Line
@@ -452,7 +478,7 @@ const CopilotCostCalculator = () => {
             <h3 className="font-semibold text-gray-900 mb-2">Cost Advantage</h3>
             <p className="text-gray-700">
               Pay-as-you-go is {currentScenario?.savingsPercent}% cheaper than M365 Copilot for your scenario,
-              saving {formatCurrency(currentScenario?.savings)} annually. This model is optimal when
+              saving {formatCurrency(currentScenario?.savings ?? 0)} annually. This model is optimal when
               credit consumption stays below 3,000 credits/user/month.
             </p>
           </div>
@@ -461,8 +487,8 @@ const CopilotCostCalculator = () => {
             <h3 className="font-semibold text-gray-900 mb-2">Breakeven Analysis</h3>
             <p className="text-gray-700">
               M365 Copilot becomes cost-effective at {formatNumber(BREAKEVEN_CREDITS)} credits/user/month.
-              Your current projection: {currentScenario?.creditsPerUserMonth} credits/user/month.
-              {currentScenario?.creditsPerUserMonth < BREAKEVEN_CREDITS
+              Your current projection: {currentScenario?.creditsPerUserMonth ?? 0} credits/user/month.
+              {(currentScenario?.creditsPerUserMonth ?? 0) < BREAKEVEN_CREDITS
                 ? ' ✓ Pay-as-you-go is optimal.'
                 : ' ⚠ Consider M365 Copilot licenses.'}
             </p>
