@@ -3,6 +3,8 @@ import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, L
 
 const CopilotCostCalculator = () => {
   const [userCount, setUserCount] = useState(1300);
+  // Note: agentCount is used for scenario categorization in the comparison table
+  // Future enhancement: could factor agent count into credit consumption calculations
   const [agentCount, setAgentCount] = useState(10);
   const [complexityRatio, setComplexityRatio] = useState('80/20');
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -12,6 +14,7 @@ const CopilotCostCalculator = () => {
   const [complexCreditsPerUser, setComplexCreditsPerUser] = useState(600);
   const [year1GrowthRate, setYear1GrowthRate] = useState(15);
   const [adoptionCeiling, setAdoptionCeiling] = useState(80);
+  const [steadyStateAdoption, setSteadyStateAdoption] = useState(60); // For scenario comparison
 
   const userScenarios = [1300, 5000, 30000];
   const agentScenarios = [10, 30, 100];
@@ -70,8 +73,8 @@ const CopilotCostCalculator = () => {
         for (const ratio of complexityScenarios) {
           const [simplePercent, complexPercent] = ratio.split('/').map(n => parseInt(n) / 100);
 
-          // Assume 60% adoption at steady state
-          const activeUsers = Math.round(users * 0.6);
+          // Use configurable steady state adoption rate
+          const activeUsers = Math.round(users * (steadyStateAdoption / 100));
           const creditsPerUserMonth = (simpleCreditsPerUser * simplePercent) + (complexCreditsPerUser * complexPercent);
           const totalCreditsMonth = activeUsers * creditsPerUserMonth;
           const totalCreditsYear = totalCreditsMonth * 12;
@@ -99,12 +102,12 @@ const CopilotCostCalculator = () => {
   };
 
   const monthlyData = useMemo(() => calculateMonthlyData(), [
-    userCount, agentCount, complexityRatio, simpleCreditsPerUser,
+    userCount, complexityRatio, simpleCreditsPerUser,
     complexCreditsPerUser, year1GrowthRate, adoptionCeiling
   ]);
 
   const scenarioData = useMemo(() => calculateScenarioComparison(), [
-    simpleCreditsPerUser, complexCreditsPerUser
+    simpleCreditsPerUser, complexCreditsPerUser, steadyStateAdoption
   ]);
 
   const currentScenario = scenarioData.find(
@@ -188,50 +191,68 @@ const CopilotCostCalculator = () => {
         </button>
 
         {showAdvanced && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6 p-4 bg-gray-100 rounded-lg">
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">
-                Simple Agent Credits/User/Month
-              </label>
-              <input
-                type="number"
-                value={simpleCreditsPerUser}
-                onChange={(e) => setSimpleCreditsPerUser(parseInt(e.target.value))}
-                className="w-full p-2 border rounded bg-white text-sm"
-              />
+          <div className="space-y-4 mb-6 p-4 bg-gray-100 rounded-lg">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">
+                  Simple Agent Credits/User/Month
+                </label>
+                <input
+                  type="number"
+                  value={simpleCreditsPerUser}
+                  onChange={(e) => setSimpleCreditsPerUser(parseInt(e.target.value) || 0)}
+                  className="w-full p-2 border rounded bg-white text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">
+                  Complex Agent Credits/User/Month
+                </label>
+                <input
+                  type="number"
+                  value={complexCreditsPerUser}
+                  onChange={(e) => setComplexCreditsPerUser(parseInt(e.target.value) || 0)}
+                  className="w-full p-2 border rounded bg-white text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">
+                  Year 1 Monthly Growth (%)
+                </label>
+                <input
+                  type="number"
+                  value={year1GrowthRate}
+                  onChange={(e) => setYear1GrowthRate(parseInt(e.target.value) || 0)}
+                  className="w-full p-2 border rounded bg-white text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">
+                  Adoption Ceiling (%)
+                </label>
+                <input
+                  type="number"
+                  value={adoptionCeiling}
+                  onChange={(e) => setAdoptionCeiling(parseInt(e.target.value) || 0)}
+                  className="w-full p-2 border rounded bg-white text-sm"
+                />
+              </div>
             </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">
-                Complex Agent Credits/User/Month
-              </label>
-              <input
-                type="number"
-                value={complexCreditsPerUser}
-                onChange={(e) => setComplexCreditsPerUser(parseInt(e.target.value))}
-                className="w-full p-2 border rounded bg-white text-sm"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">
-                Year 1 Monthly Growth (%)
-              </label>
-              <input
-                type="number"
-                value={year1GrowthRate}
-                onChange={(e) => setYear1GrowthRate(parseFloat(e.target.value))}
-                className="w-full p-2 border rounded bg-white text-sm"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">
-                Adoption Ceiling (%)
-              </label>
-              <input
-                type="number"
-                value={adoptionCeiling}
-                onChange={(e) => setAdoptionCeiling(parseInt(e.target.value))}
-                className="w-full p-2 border rounded bg-white text-sm"
-              />
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">
+                  Steady State Adoption (%)
+                </label>
+                <input
+                  type="number"
+                  value={steadyStateAdoption}
+                  onChange={(e) => setSteadyStateAdoption(parseInt(e.target.value) || 0)}
+                  className="w-full p-2 border rounded bg-white text-sm"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Used for scenario comparison matrix
+                </p>
+              </div>
             </div>
           </div>
         )}
