@@ -42,6 +42,12 @@ const CopilotCostCalculator: React.FC = () => {
   const [adoptionCeiling, setAdoptionCeiling] = useState<number>(80);
   const [steadyStateAdoption, setSteadyStateAdoption] = useState<number>(60); // For scenario comparison
 
+  // Validation constraints
+  const VALIDATION = {
+    credits: { min: 0, max: 10000 },
+    percentage: { min: 0, max: 100 }
+  };
+
   const userScenarios: number[] = [1300, 5000, 30000];
   const agentScenarios: number[] = [10, 30, 100];
   const complexityScenarios: string[] = ['80/20', '70/30', '50/50'];
@@ -52,6 +58,12 @@ const CopilotCostCalculator: React.FC = () => {
   const PACK_CREDITS: number = 25000;
   const M365_COPILOT_COST: number = 30;
   const BREAKEVEN_CREDITS: number = M365_COPILOT_COST / PAYG_RATE;
+
+  // Validation helper function
+  const validateNumber = (value: number, min: number, max: number): number => {
+    const num = isNaN(value) ? min : value;
+    return Math.min(Math.max(num, min), max);
+  };
 
   const calculateMonthlyData = (): MonthlyData[] => {
     const [simplePercent, complexPercent] = complexityRatio.split('/').map((n: string) => parseInt(n) / 100);
@@ -225,9 +237,15 @@ const CopilotCostCalculator: React.FC = () => {
                 </label>
                 <input
                   type="number"
+                  min={VALIDATION.credits.min}
+                  max={VALIDATION.credits.max}
                   value={simpleCreditsPerUser}
-                  onChange={(e: ChangeEvent<HTMLInputElement>) => setSimpleCreditsPerUser(parseInt(e.target.value) || 0)}
+                  onChange={(e: ChangeEvent<HTMLInputElement>) => {
+                    const val = parseInt(e.target.value) || 0;
+                    setSimpleCreditsPerUser(validateNumber(val, VALIDATION.credits.min, VALIDATION.credits.max));
+                  }}
                   className="w-full p-2 border rounded bg-white text-sm"
+                  placeholder="0-10000"
                 />
               </div>
               <div>
@@ -236,9 +254,15 @@ const CopilotCostCalculator: React.FC = () => {
                 </label>
                 <input
                   type="number"
+                  min={VALIDATION.credits.min}
+                  max={VALIDATION.credits.max}
                   value={complexCreditsPerUser}
-                  onChange={(e: ChangeEvent<HTMLInputElement>) => setComplexCreditsPerUser(parseInt(e.target.value) || 0)}
+                  onChange={(e: ChangeEvent<HTMLInputElement>) => {
+                    const val = parseInt(e.target.value) || 0;
+                    setComplexCreditsPerUser(validateNumber(val, VALIDATION.credits.min, VALIDATION.credits.max));
+                  }}
                   className="w-full p-2 border rounded bg-white text-sm"
+                  placeholder="0-10000"
                 />
               </div>
               <div>
@@ -247,9 +271,15 @@ const CopilotCostCalculator: React.FC = () => {
                 </label>
                 <input
                   type="number"
+                  min={VALIDATION.percentage.min}
+                  max={VALIDATION.percentage.max}
                   value={year1GrowthRate}
-                  onChange={(e: ChangeEvent<HTMLInputElement>) => setYear1GrowthRate(parseInt(e.target.value) || 0)}
+                  onChange={(e: ChangeEvent<HTMLInputElement>) => {
+                    const val = parseInt(e.target.value) || 0;
+                    setYear1GrowthRate(validateNumber(val, VALIDATION.percentage.min, VALIDATION.percentage.max));
+                  }}
                   className="w-full p-2 border rounded bg-white text-sm"
+                  placeholder="0-100"
                 />
               </div>
               <div>
@@ -258,9 +288,15 @@ const CopilotCostCalculator: React.FC = () => {
                 </label>
                 <input
                   type="number"
+                  min={VALIDATION.percentage.min}
+                  max={VALIDATION.percentage.max}
                   value={adoptionCeiling}
-                  onChange={(e: ChangeEvent<HTMLInputElement>) => setAdoptionCeiling(parseInt(e.target.value) || 0)}
+                  onChange={(e: ChangeEvent<HTMLInputElement>) => {
+                    const val = parseInt(e.target.value) || 0;
+                    setAdoptionCeiling(validateNumber(val, VALIDATION.percentage.min, VALIDATION.percentage.max));
+                  }}
                   className="w-full p-2 border rounded bg-white text-sm"
+                  placeholder="0-100"
                 />
               </div>
             </div>
@@ -271,9 +307,15 @@ const CopilotCostCalculator: React.FC = () => {
                 </label>
                 <input
                   type="number"
+                  min={VALIDATION.percentage.min}
+                  max={VALIDATION.percentage.max}
                   value={steadyStateAdoption}
-                  onChange={(e: ChangeEvent<HTMLInputElement>) => setSteadyStateAdoption(parseInt(e.target.value) || 0)}
+                  onChange={(e: ChangeEvent<HTMLInputElement>) => {
+                    const val = parseInt(e.target.value) || 0;
+                    setSteadyStateAdoption(validateNumber(val, VALIDATION.percentage.min, VALIDATION.percentage.max));
+                  }}
                   className="w-full p-2 border rounded bg-white text-sm"
+                  placeholder="0-100"
                 />
                 <p className="text-xs text-gray-500 mt-1">
                   Used for scenario comparison matrix
