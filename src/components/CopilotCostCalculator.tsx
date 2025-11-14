@@ -284,21 +284,28 @@ const CopilotCostCalculator: React.FC = () => {
         <h2 className="text-xl font-bold text-gray-900 mb-4">
           24-Month Cost Projection
         </h2>
-        <ResponsiveContainer width="100%" height={400}>
-          <LineChart data={monthlyData}>
+        <ResponsiveContainer width="100%" height={480}>
+          <LineChart
+            data={monthlyData}
+            margin={{ top: 20, right: 30, left: 60, bottom: 60 }}
+          >
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis
               dataKey="month"
-              label={{ value: 'Month', position: 'insideBottom', offset: -5 }}
+              label={{ value: 'Month', position: 'insideBottom', offset: -10 }}
             />
             <YAxis
-              label={{ value: 'Cost ($)', angle: -90, position: 'insideLeft' }}
+              label={{ value: 'Cost ($)', angle: -90, position: 'insideLeft', offset: 10 }}
             />
             <Tooltip
               formatter={(value: number) => formatCurrency(value)}
               labelFormatter={(month: number) => `Month ${month}`}
             />
-            <Legend />
+            <Legend
+              verticalAlign="top"
+              height={36}
+              wrapperStyle={{ paddingBottom: '10px' }}
+            />
             <Line
               type="monotone"
               dataKey="paygCost"
@@ -310,7 +317,7 @@ const CopilotCostCalculator: React.FC = () => {
             <Line
               type="monotone"
               dataKey="m365Cost"
-              stroke="#9ca3af"
+              stroke="#7c3aed"
               strokeWidth={2}
               strokeDasharray="5 5"
               name="M365 Copilot (reference)"
@@ -340,20 +347,27 @@ const CopilotCostCalculator: React.FC = () => {
         <h2 className="text-xl font-bold text-gray-900 mb-4">
           User Adoption Curve
         </h2>
-        <ResponsiveContainer width="100%" height={300}>
-          <LineChart data={monthlyData}>
+        <ResponsiveContainer width="100%" height={380}>
+          <LineChart
+            data={monthlyData}
+            margin={{ top: 20, right: 30, left: 60, bottom: 60 }}
+          >
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis
               dataKey="month"
-              label={{ value: 'Month', position: 'insideBottom', offset: -5 }}
+              label={{ value: 'Month', position: 'insideBottom', offset: -10 }}
             />
             <YAxis
-              label={{ value: 'Active Users', angle: -90, position: 'insideLeft' }}
+              label={{ value: 'Active Users', angle: -90, position: 'insideLeft', offset: 10 }}
             />
             <Tooltip
               labelFormatter={(month: number) => `Month ${month}`}
             />
-            <Legend />
+            <Legend
+              verticalAlign="top"
+              height={36}
+              wrapperStyle={{ paddingBottom: '10px' }}
+            />
             <Line
               type="monotone"
               dataKey="activeUsers"
