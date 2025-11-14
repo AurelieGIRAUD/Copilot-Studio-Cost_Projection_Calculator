@@ -1,31 +1,14 @@
 import React, { useState, useMemo, ChangeEvent } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-
-// Type definitions
-interface MonthlyData {
-  month: number;
-  year: string;
-  adoption: number;
-  activeUsers: number;
-  totalCredits: number;
-  paygCost: number;
-  packCost: number;
-  m365Cost: number;
-  savings: number;
-}
-
-interface ScenarioData {
-  users: number;
-  agents: number;
-  ratio: string;
-  activeUsers: number;
-  creditsPerUserMonth: number;
-  monthlyPayg: number;
-  yearlyPayg: number;
-  yearlyM365: number;
-  savings: number;
-  savingsPercent: number;
-}
+import {
+  calculateMonthlyData,
+  calculateScenarioComparison,
+  validateNumber,
+  formatCurrency,
+  formatNumber,
+  BREAKEVEN_CREDITS,
+  type ScenarioData
+} from '../utils/calculations';
 
 const CopilotCostCalculator: React.FC = () => {
   const [userCount, setUserCount] = useState<number>(1300);
@@ -52,108 +35,33 @@ const CopilotCostCalculator: React.FC = () => {
   const agentScenarios: number[] = [10, 30, 100];
   const complexityScenarios: string[] = ['80/20', '70/30', '50/50'];
 
-  // Constants
-  const PAYG_RATE: number = 0.01;
-  const PACK_COST: number = 200;
-  const PACK_CREDITS: number = 25000;
-  const M365_COPILOT_COST: number = 30;
-  const BREAKEVEN_CREDITS: number = M365_COPILOT_COST / PAYG_RATE;
-
-  // Validation helper function
-  const validateNumber = (value: number, min: number, max: number): number => {
-    const num = isNaN(value) ? min : value;
-    return Math.min(Math.max(num, min), max);
-  };
-
-  const calculateMonthlyData = (): MonthlyData[] => {
-    const [simplePercent, complexPercent] = complexityRatio.split('/').map((n: string) => parseInt(n) / 100);
-
-    const data: MonthlyData[] = [];
-    let currentAdoption = 10;
-
-    for (let month = 1; month <= 24; month++) {
-      // Year 1: growing engagement, Year 2: stable
-      if (month <= 12) {
-        currentAdoption = Math.min(adoptionCeiling, 10 + (month - 1) * year1GrowthRate);
-      }
-
-      const activeUsers = Math.round(userCount * (currentAdoption / 100));
-      const creditsPerUserMonth = (simpleCreditsPerUser * simplePercent) + (complexCreditsPerUser * complexPercent);
-      const totalCredits = activeUsers * creditsPerUserMonth;
-
-      // Calculate costs
-      const paygCost = totalCredits * PAYG_RATE;
-      const packsNeeded = Math.ceil(totalCredits / PACK_CREDITS);
-      const packCost = packsNeeded * PACK_COST;
-      const m365Cost = userCount * M365_COPILOT_COST;
-
-      data.push({
-        month,
-        year: month <= 12 ? 'Year 1' : 'Year 2',
-        adoption: currentAdoption,
-        activeUsers,
-        totalCredits,
-        paygCost: Math.round(paygCost),
-        packCost,
-        m365Cost,
-        savings: Math.round(m365Cost - paygCost)
-      });
-    }
-
-    return data;
-  };
-
-  const calculateScenarioComparison = (): ScenarioData[] => {
-    const results: ScenarioData[] = [];
-
-    for (const users of userScenarios) {
-      for (const agents of agentScenarios) {
-        for (const ratio of complexityScenarios) {
-          const [simplePercent, complexPercent] = ratio.split('/').map((n: string) => parseInt(n) / 100);
-
-          // Use configurable steady state adoption rate
-          const activeUsers = Math.round(users * (steadyStateAdoption / 100));
-          const creditsPerUserMonth = (simpleCreditsPerUser * simplePercent) + (complexCreditsPerUser * complexPercent);
-          const totalCreditsMonth = activeUsers * creditsPerUserMonth;
-          const totalCreditsYear = totalCreditsMonth * 12;
-
-          const paygYearlyCost = totalCreditsYear * PAYG_RATE;
-          const m365YearlyCost = users * M365_COPILOT_COST * 12;
-
-          results.push({
-            users,
-            agents,
-            ratio,
-            activeUsers,
-            creditsPerUserMonth: Math.round(creditsPerUserMonth),
-            monthlyPayg: Math.round(totalCreditsMonth * PAYG_RATE),
-            yearlyPayg: Math.round(paygYearlyCost),
-            yearlyM365: m365YearlyCost,
-            savings: Math.round(m365YearlyCost - paygYearlyCost),
-            savingsPercent: Math.round(((m365YearlyCost - paygYearlyCost) / m365YearlyCost) * 100)
-          });
-        }
-      }
-    }
-
-    return results;
-  };
-
-  const monthlyData = useMemo(() => calculateMonthlyData(), [
+  const monthlyData = useMemo(() => calculateMonthlyData({
+    userCount,
+    complexityRatio,
+    simpleCreditsPerUser,
+    complexCreditsPerUser,
+    year1GrowthRate,
+    adoptionCeiling,
+    steadyStateAdoption
+  }), [
     userCount, complexityRatio, simpleCreditsPerUser,
-    complexCreditsPerUser, year1GrowthRate, adoptionCeiling
+    complexCreditsPerUser, year1GrowthRate, adoptionCeiling, steadyStateAdoption
   ]);
 
-  const scenarioData = useMemo(() => calculateScenarioComparison(), [
+  const scenarioData = useMemo(() => calculateScenarioComparison(
+    userScenarios,
+    agentScenarios,
+    complexityScenarios,
+    simpleCreditsPerUser,
+    complexCreditsPerUser,
+    steadyStateAdoption
+  ), [
     simpleCreditsPerUser, complexCreditsPerUser, steadyStateAdoption
   ]);
 
   const currentScenario: ScenarioData | undefined = scenarioData.find(
     (s: ScenarioData) => s.users === userCount && s.agents === agentCount && s.ratio === complexityRatio
   );
-
-  const formatCurrency = (value: number): string => `$${value.toLocaleString()}`;
-  const formatNumber = (value: number): string => value.toLocaleString();
 
   return (
     <div className="w-full max-w-7xl mx-auto p-6 bg-gray-50">
