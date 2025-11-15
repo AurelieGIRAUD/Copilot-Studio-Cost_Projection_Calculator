@@ -47,8 +47,8 @@ interface PricingSummary {
 }
 
 const CopilotCostCalculator: React.FC = () => {
-  // Stages with time-based rollout
-  const [stages] = useState<Stage[]>([
+  // Stages with time-based rollout (now editable)
+  const [stages, setStages] = useState<Stage[]>([
     { name: 'Pilot (HQ)', users: 130, month: 1, dau: 0.45, phase: 'Pilot' },
     { name: 'HQ Expansion', users: 500, month: 4, dau: 0.40, phase: 'Expansion' },
     { name: 'Full HQ', users: 1000, month: 7, dau: 0.38, phase: 'Expansion' },
@@ -70,7 +70,20 @@ const CopilotCostCalculator: React.FC = () => {
     hybridM365Users: 200
   });
 
+  const [agentCount, setAgentCount] = useState<number>(10);
   const [showAdvanced, setShowAdvanced] = useState<boolean>(false);
+  const [showStageEditor, setShowStageEditor] = useState<boolean>(false);
+
+  // Update stage values
+  const updateStage = (index: number, field: 'users' | 'dau', value: number) => {
+    const newStages = [...stages];
+    if (field === 'dau') {
+      newStages[index] = { ...newStages[index], dau: value / 100 };
+    } else {
+      newStages[index] = { ...newStages[index], [field]: value };
+    }
+    setStages(newStages);
+  };
 
   // Parameter ranges with market research guidance
   const parameterRanges = {
@@ -297,6 +310,100 @@ const CopilotCostCalculator: React.FC = () => {
             <strong>Usage-Based Model:</strong> {creditsPerConversation.toFixed(1)} credits/conversation •
             Classic turns (1 credit) • Generative turns (2 credits) • Actions (5 credits each)
           </p>
+        </div>
+
+        {/* Deployment Configuration */}
+        <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
+          <h3 className="text-lg font-semibold text-gray-800 mb-4">Deployment Configuration</h3>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Number of Agents
+              </label>
+              <select
+                value={agentCount}
+                onChange={(e: ChangeEvent<HTMLSelectElement>) => setAgentCount(parseInt(e.target.value))}
+                className="w-full p-2 border rounded-lg bg-white"
+              >
+                <option value={10}>10 agents</option>
+                <option value={30}>30 agents</option>
+                <option value={100}>100 agents</option>
+              </select>
+              <p className="text-xs text-gray-500 mt-1">Number of copilot agents deployed</p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Final User Count (Month 31)
+              </label>
+              <div className="text-2xl font-bold text-blue-900">
+                {formatNumber(stages[stages.length - 1].users)} users
+              </div>
+              <p className="text-xs text-gray-500 mt-1">Click "Edit Deployment Stages" to adjust</p>
+            </div>
+          </div>
+
+          <button
+            onClick={() => setShowStageEditor(!showStageEditor)}
+            className="text-blue-600 hover:text-blue-800 font-medium"
+          >
+            {showStageEditor ? '▼' : '▶'} Edit Deployment Stages (Users & DAU)
+          </button>
+
+          {showStageEditor && (
+            <div className="mt-4 space-y-3 p-4 bg-white rounded-lg border border-gray-300">
+              <p className="text-sm text-gray-600 mb-3">
+                Adjust the number of users and DAU (Daily Active Users) percentage for each deployment stage:
+              </p>
+              {stages.map((stage, idx) => (
+                <div key={idx} className="grid grid-cols-1 md:grid-cols-3 gap-3 items-center p-3 bg-gray-50 rounded">
+                  <div>
+                    <span className="text-xs font-semibold text-gray-600">Month {stage.month}</span>
+                    <div className="font-semibold text-gray-900">{stage.name}</div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      Users
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={50000}
+                      step={100}
+                      value={stage.users}
+                      onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                        updateStage(idx, 'users', parseInt(e.target.value) || 0)
+                      }
+                      className="w-full p-2 border rounded text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      DAU (Daily Active Users %)
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={100}
+                      step={1}
+                      value={(stage.dau * 100).toFixed(0)}
+                      onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                        updateStage(idx, 'dau', parseInt(e.target.value) || 0)
+                      }
+                      className="w-full p-2 border rounded text-sm"
+                    />
+                  </div>
+                </div>
+              ))}
+              <div className="mt-3 p-3 bg-blue-50 rounded border border-blue-200">
+                <p className="text-xs text-blue-800">
+                  💡 <strong>Tip:</strong> Higher DAU % means more users are actively using the system daily.
+                  Typically, early adopters (HQ) have higher DAU than later groups (stores).
+                </p>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Parameter Sliders */}
