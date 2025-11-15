@@ -835,28 +835,28 @@ const CopilotCostCalculator: React.FC = () => {
           Strategic Recommendations
         </h2>
 
-        <div className="space-y-4">
-          <div className="border-l-4 border-green-500 pl-4">
-            <h3 className="font-semibold text-gray-900 mb-2">Winner by Stage</h3>
-            <p className="text-gray-700">
+        <div className="space-y-3">
+          <div className="bg-green-50 p-3 rounded-lg">
+            <h4 className="font-semibold text-green-900 mb-1">Winner by Stage</h4>
+            <p className="text-sm text-green-800">
               <strong>Best Overall:</strong> {cheapestModel.model} with 3-year total of {formatCurrency(cheapestModel.total)}.
               {cheapestModel.model.includes('PAYG') && ' PAYG models offer cost advantages at lower usage levels.'}
               {cheapestModel.model.includes('M365') && ' Hybrid models balance license costs with usage-based pricing.'}
             </p>
           </div>
 
-          <div className="border-l-4 border-blue-500 pl-4">
-            <h3 className="font-semibold text-gray-900 mb-2">Breakeven Analysis</h3>
-            <p className="text-gray-700">
+          <div className="bg-blue-50 p-3 rounded-lg">
+            <h4 className="font-semibold text-blue-900 mb-1">Breakeven Analysis</h4>
+            <p className="text-sm text-blue-800">
               At {creditsPerConversation.toFixed(1)} credits/conversation, monitor monthly consumption closely.
               M365 Copilot ($30/user/month) becomes cost-effective at 3,000 credits/user/month.
               Hybrid models optimize costs by giving M365 licenses to power users while using PAYG for occasional users.
             </p>
           </div>
 
-          <div className="border-l-4 border-yellow-500 pl-4">
-            <h3 className="font-semibold text-gray-900 mb-2">Recommended Phased Strategy</h3>
-            <ul className="list-disc list-inside text-gray-700 space-y-1">
+          <div className="bg-yellow-50 p-3 rounded-lg">
+            <h4 className="font-semibold text-yellow-900 mb-1">Recommended Phased Strategy</h4>
+            <ul className="list-disc list-inside text-sm text-yellow-800 space-y-1">
               <li><strong>Pilot (Month 1-3):</strong> Start with PAYG to measure actual usage patterns</li>
               <li><strong>Expansion (Month 4-9):</strong> Continue PAYG, consider P3 if usage is consistent</li>
               <li><strong>Management (Month 10-18):</strong> Evaluate hybrid models for power users</li>
@@ -864,9 +864,9 @@ const CopilotCostCalculator: React.FC = () => {
             </ul>
           </div>
 
-          <div className="border-l-4 border-purple-500 pl-4">
-            <h3 className="font-semibold text-gray-900 mb-2">3-Year Total Comparison</h3>
-            <p className="text-gray-700">
+          <div className="bg-purple-50 p-3 rounded-lg">
+            <h4 className="font-semibold text-purple-900 mb-1">3-Year Total Comparison</h4>
+            <p className="text-sm text-purple-800">
               Savings from {cheapestModel.model} vs most expensive: {formatCurrency(
                 pricingSummary.reduce((max, curr) => curr.total > max.total ? curr : max).total - cheapestModel.total
               )}. The choice depends on your organization's M365 licensing strategy and predicted usage growth.
