@@ -510,22 +510,41 @@ const CopilotCostCalculator: React.FC = () => {
   const licensingImpact = useMemo(() => {
     const BREAKEVEN_CREDITS = 3000;
 
-    // Calculate average credits per user per month from agent portfolio
-    const totalAgentCredits = agents.reduce((sum, agent) => {
-      const creditsPerConv = calculateAgentCredits(agent);
-      return sum + (agent.conversationsPerDay * creditsPerConv * 30);
-    }, 0);
+    // Calculate metrics for Month 12, 24, and 36 to show evolution
+    const calculateMonthMetrics = (month: number) => {
+      const monthCostData = agentMonthlyCosts[month - 1];
+      const monthUserData = monthlyData[month - 1];
 
-    const avgCreditsPerUserMonth = totalAgentCredits;
-    const breakevenMonth = agentMonthlyCosts.findIndex(mc =>
-      mc.totalCost > 0 && (mc.totalCost / (monthlyData[mc.month - 1]?.activeUsers || 1) * 1) >= (BREAKEVEN_CREDITS * 0.01)
-    ) + 1;
+      if (!monthCostData || !monthUserData || monthUserData.activeUsers === 0) {
+        return { creditsPerUser: 0, costPerUser: 0 };
+      }
+
+      // Total credits = total cost / $0.01
+      const totalCredits = monthCostData.totalCost / 0.01;
+      const creditsPerUser = totalCredits / monthUserData.activeUsers;
+      const costPerUser = monthCostData.totalCost / monthUserData.activeUsers;
+
+      return {
+        creditsPerUser: Math.round(creditsPerUser),
+        costPerUser: Math.round(costPerUser * 100) / 100
+      };
+    };
+
+    const month12 = calculateMonthMetrics(12);
+    const month24 = calculateMonthMetrics(24);
+    const month36 = calculateMonthMetrics(36);
+
+    // Use Month 24 (Year 2 end) as primary metric - all agents deployed, significant user base
+    const avgCreditsPerUserMonth = month24.creditsPerUser;
+    const monthlyCostPerUser = month24.costPerUser;
 
     return {
-      avgCreditsPerUserMonth: Math.round(avgCreditsPerUserMonth),
-      breakevenMonth: breakevenMonth || null,
+      avgCreditsPerUserMonth,
+      monthlyCostPerUser,
       recommendM365: avgCreditsPerUserMonth > BREAKEVEN_CREDITS,
-      monthlyCostPerUser: Math.round(avgCreditsPerUserMonth * 0.01)
+      month12,
+      month24,
+      month36
     };
   }, [agents, agentMonthlyCosts, monthlyData]);
 
@@ -1460,16 +1479,16 @@ const CopilotCostCalculator: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
             {/* Key Metrics */}
             <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg p-5 border-2 border-blue-200">
-              <h3 className="font-semibold text-blue-900 mb-3">📊 Portfolio Metrics</h3>
+              <h3 className="font-semibold text-blue-900 mb-3">📊 Portfolio Metrics (Month 24)</h3>
               <div className="space-y-3">
                 <div className="bg-white rounded p-3">
                   <div className="text-sm text-gray-600">Avg Credits/User/Month</div>
                   <div className="text-2xl font-bold text-blue-900">{formatNumber(licensingImpact.avgCreditsPerUserMonth)}</div>
-                  <div className="text-xs text-gray-500 mt-1">From all {agents.length} agents combined</div>
+                  <div className="text-xs text-gray-500 mt-1">Based on actual deployment and user counts</div>
                 </div>
                 <div className="bg-white rounded p-3">
                   <div className="text-sm text-gray-600">Monthly Cost/User (PAYG)</div>
-                  <div className="text-2xl font-bold text-blue-900">${licensingImpact.monthlyCostPerUser}</div>
+                  <div className="text-2xl font-bold text-blue-900">${licensingImpact.monthlyCostPerUser?.toFixed(2) || '0.00'}</div>
                   <div className="text-xs text-gray-500 mt-1">At $0.01 per credit</div>
                 </div>
               </div>
@@ -1541,6 +1560,78 @@ const CopilotCostCalculator: React.FC = () => {
                   </p>
                 </div>
               </div>
+            </div>
+          </div>
+
+          {/* Evolution Over Time */}
+          <div className="bg-white rounded-lg border-2 border-blue-200 p-5 mt-6">
+            <h3 className="font-semibold text-gray-900 mb-3">📈 Credits/User Evolution (Changes with User Growth)</h3>
+            <p className="text-sm text-gray-600 mb-4">
+              These metrics change as your user base grows and agents deploy. The calculations are based on actual monthly costs divided by active users.
+            </p>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-blue-100">
+                  <tr>
+                    <th className="p-3 text-left">Milestone</th>
+                    <th className="p-3 text-right">Total Users</th>
+                    <th className="p-3 text-right">Agents Deployed</th>
+                    <th className="p-3 text-right">Credits/User/Month</th>
+                    <th className="p-3 text-right">Cost/User/Month</th>
+                    <th className="p-3 text-right">Recommendation</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr className="border-b hover:bg-gray-50">
+                    <td className="p-3 font-medium">Month 12 (End of Year 1)</td>
+                    <td className="p-3 text-right">{formatNumber(monthlyData[11]?.users || 0)}</td>
+                    <td className="p-3 text-right">{agents.filter(a => a.deployMonth <= 12).length} of {agents.length}</td>
+                    <td className="p-3 text-right font-mono">{formatNumber(licensingImpact.month12.creditsPerUser)}</td>
+                    <td className="p-3 text-right font-mono">${licensingImpact.month12.costPerUser.toFixed(2)}</td>
+                    <td className="p-3 text-right">
+                      <span className={`px-2 py-1 rounded text-xs font-semibold ${
+                        licensingImpact.month12.creditsPerUser > 3000 ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
+                      }`}>
+                        {licensingImpact.month12.creditsPerUser > 3000 ? 'M365' : 'PAYG'}
+                      </span>
+                    </td>
+                  </tr>
+                  <tr className="border-b hover:bg-gray-50 bg-blue-50">
+                    <td className="p-3 font-medium">Month 24 (End of Year 2)</td>
+                    <td className="p-3 text-right">{formatNumber(monthlyData[23]?.users || 0)}</td>
+                    <td className="p-3 text-right">{agents.filter(a => a.deployMonth <= 24).length} of {agents.length}</td>
+                    <td className="p-3 text-right font-mono">{formatNumber(licensingImpact.month24.creditsPerUser)}</td>
+                    <td className="p-3 text-right font-mono">${licensingImpact.month24.costPerUser.toFixed(2)}</td>
+                    <td className="p-3 text-right">
+                      <span className={`px-2 py-1 rounded text-xs font-semibold ${
+                        licensingImpact.month24.creditsPerUser > 3000 ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
+                      }`}>
+                        {licensingImpact.month24.creditsPerUser > 3000 ? 'M365' : 'PAYG'}
+                      </span>
+                    </td>
+                  </tr>
+                  <tr className="border-b hover:bg-gray-50">
+                    <td className="p-3 font-medium">Month 36 (End of Year 3)</td>
+                    <td className="p-3 text-right">{formatNumber(monthlyData[35]?.users || 0)}</td>
+                    <td className="p-3 text-right">{agents.length} of {agents.length}</td>
+                    <td className="p-3 text-right font-mono">{formatNumber(licensingImpact.month36.creditsPerUser)}</td>
+                    <td className="p-3 text-right font-mono">${licensingImpact.month36.costPerUser.toFixed(2)}</td>
+                    <td className="p-3 text-right">
+                      <span className={`px-2 py-1 rounded text-xs font-semibold ${
+                        licensingImpact.month36.creditsPerUser > 3000 ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
+                      }`}>
+                        {licensingImpact.month36.creditsPerUser > 3000 ? 'M365' : 'PAYG'}
+                      </span>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div className="mt-3 bg-gray-50 rounded p-3">
+              <p className="text-xs text-gray-600">
+                <strong>💡 Key Insight:</strong> Credits per user can actually <strong>decrease</strong> as you scale if agents with segment restrictions
+                (like "HQ only") deploy later while your user base grows. Early pilots with all-access agents show higher per-user costs.
+              </p>
             </div>
           </div>
         </div>
