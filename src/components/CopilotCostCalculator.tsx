@@ -881,56 +881,29 @@ const CopilotCostCalculator: React.FC = () => {
           Cost Optimization Tips
         </h2>
 
-        <div className="space-y-3">
-          <div className="bg-blue-50 p-3 rounded-lg">
-            <h4 className="font-semibold text-blue-900 mb-1">Classic vs Generative Turns</h4>
-            <p className="text-sm text-blue-800">
-              Classic responses (1 credit) cost 50% less than generative (2 credits). Design agents to use classic responses for FAQ-style queries and reserve generative AI for complex problem-solving.
-            </p>
-          </div>
-
-          <div className="bg-green-50 p-3 rounded-lg">
-            <h4 className="font-semibold text-green-900 mb-1">Action Usage Best Practices</h4>
-            <p className="text-sm text-green-800">
-              Actions cost 5 credits each. Batch multiple data operations into single actions where possible. Cache frequently-accessed data to reduce redundant action calls.
-            </p>
-          </div>
-
-          <div className="bg-yellow-50 p-3 rounded-lg">
-            <h4 className="font-semibold text-yellow-900 mb-1">Peak Month Planning</h4>
-            <p className="text-sm text-yellow-800">
-              Plan for {((config.peakMultiplier - 1) * 100).toFixed(0)}% usage spikes every 6 months. Consider P3 pre-purchase (15% discount) if your baseline usage is predictable.
-            </p>
-          </div>
-
-          <div className="bg-purple-50 p-3 rounded-lg">
-            <h4 className="font-semibold text-purple-900 mb-1">When to Switch: PAYG → P3</h4>
-            <p className="text-sm text-purple-800">
-              P3 pre-purchase offers 15% savings. Switch when monthly usage is consistent (±20%) for 3+ months. The discount offsets the commitment risk.
-            </p>
-          </div>
-
-          <div className="bg-pink-50 p-3 rounded-lg">
-            <h4 className="font-semibold text-pink-900 mb-1">When to Add M365 Licenses (Hybrid)</h4>
-            <p className="text-sm text-pink-800">
-              Give M365 Copilot licenses to users consuming &gt;3,000 credits/month. For hybrid models, only autonomous actions ({(config.autonomousActionRatio * 100).toFixed(0)}% of actions) incur credits for licensed users.
-            </p>
-          </div>
-
-          <div className="bg-indigo-50 p-3 rounded-lg">
-            <h4 className="font-semibold text-indigo-900 mb-1">Autonomous Action Optimization</h4>
-            <p className="text-sm text-indigo-800">
-              With M365 licenses, user-triggered actions are free - only autonomous (scheduled/background) actions incur credits. Design workflows to maximize user-triggered interactions.
-            </p>
-          </div>
-
-          <div className="bg-gray-50 p-3 rounded-lg">
-            <h4 className="font-semibold text-gray-900 mb-1">Dev/Test/Prod Separation</h4>
-            <p className="text-sm text-gray-800">
-              Separate development and testing environments from production billing. Use mock responses in dev/test to avoid consuming production credits during agent development.
-            </p>
-          </div>
-        </div>
+        <ul className="list-disc list-inside text-gray-700 space-y-2">
+          <li>
+            <strong>Classic vs Generative Turns:</strong> Classic responses (1 credit) cost 50% less than generative (2 credits). Design agents to use classic responses for FAQ-style queries and reserve generative AI for complex problem-solving.
+          </li>
+          <li>
+            <strong>Action Usage Best Practices:</strong> Actions cost 5 credits each. Batch multiple data operations into single actions where possible. Cache frequently-accessed data to reduce redundant action calls.
+          </li>
+          <li>
+            <strong>Peak Month Planning:</strong> Plan for {((config.peakMultiplier - 1) * 100).toFixed(0)}% usage spikes every 6 months. Consider P3 pre-purchase (15% discount) if your baseline usage is predictable.
+          </li>
+          <li>
+            <strong>When to Switch: PAYG → P3:</strong> P3 pre-purchase offers 15% savings. Switch when monthly usage is consistent (±20%) for 3+ months. The discount offsets the commitment risk.
+          </li>
+          <li>
+            <strong>When to Add M365 Licenses (Hybrid):</strong> Give M365 Copilot licenses to users consuming &gt;3,000 credits/month. For hybrid models, only autonomous actions ({(config.autonomousActionRatio * 100).toFixed(0)}% of actions) incur credits for licensed users.
+          </li>
+          <li>
+            <strong>Autonomous Action Optimization:</strong> With M365 licenses, user-triggered actions are free - only autonomous (scheduled/background) actions incur credits. Design workflows to maximize user-triggered interactions.
+          </li>
+          <li>
+            <strong>Dev/Test/Prod Separation:</strong> Separate development and testing environments from production billing. Use mock responses in dev/test to avoid consuming production credits during agent development.
+          </li>
+        </ul>
       </div>
     </div>
   );
