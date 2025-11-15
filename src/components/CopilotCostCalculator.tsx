@@ -73,6 +73,7 @@ const CopilotCostCalculator: React.FC = () => {
   const [agentCount, setAgentCount] = useState<number>(10);
   const [showAdvanced, setShowAdvanced] = useState<boolean>(false);
   const [showStageEditor, setShowStageEditor] = useState<boolean>(false);
+  const [showRolloutPlan, setShowRolloutPlan] = useState<boolean>(false);
 
   // Update stage values
   const updateStage = (index: number, field: 'users' | 'dau', value: number) => {
@@ -777,55 +778,67 @@ const CopilotCostCalculator: React.FC = () => {
         </ResponsiveContainer>
 
         {/* Onboarding Roadmap with Milestones */}
-        <div className="mt-6 space-y-3">
-          <h3 className="font-semibold text-gray-800 mb-3">Rollout Milestones & Strategy</h3>
-          {stages.map((stage, idx) => (
-            <div key={idx} className="relative pl-8 pb-4">
-              {/* Timeline connector */}
-              {idx < stages.length - 1 && (
-                <div className="absolute left-2 top-6 bottom-0 w-0.5 bg-gray-300"></div>
-              )}
+        <div className="mt-6">
+          <button
+            onClick={() => setShowRolloutPlan(!showRolloutPlan)}
+            className="text-blue-600 hover:text-blue-800 font-medium mb-3"
+          >
+            {showRolloutPlan ? '▼' : '▶'} Rollout Milestones & Strategy
+          </button>
 
-              {/* Milestone marker */}
-              <div className="absolute left-0 top-1 w-4 h-4 rounded-full bg-blue-500 border-2 border-white"></div>
+          {showRolloutPlan && (
+            <>
+              <div className="space-y-3">
+                {stages.map((stage, idx) => (
+                  <div key={idx} className="relative pl-8 pb-4">
+                    {/* Timeline connector */}
+                    {idx < stages.length - 1 && (
+                      <div className="absolute left-2 top-6 bottom-0 w-0.5 bg-gray-300"></div>
+                    )}
 
-              <div className="bg-gray-50 rounded-lg p-3 hover:bg-gray-100 transition-colors">
-                <div className="flex items-center justify-between mb-1">
-                  <div className="flex items-center gap-3">
-                    <span className="text-xs font-semibold text-blue-600 bg-blue-100 px-2 py-1 rounded">
-                      Month {stage.month}
-                    </span>
-                    <span className="font-semibold text-gray-900">{stage.name}</span>
+                    {/* Milestone marker */}
+                    <div className="absolute left-0 top-1 w-4 h-4 rounded-full bg-blue-500 border-2 border-white"></div>
+
+                    <div className="bg-gray-50 rounded-lg p-3 hover:bg-gray-100 transition-colors">
+                      <div className="flex items-center justify-between mb-1">
+                        <div className="flex items-center gap-3">
+                          <span className="text-xs font-semibold text-blue-600 bg-blue-100 px-2 py-1 rounded">
+                            Month {stage.month}
+                          </span>
+                          <span className="font-semibold text-gray-900">{stage.name}</span>
+                        </div>
+                        <span className={`text-xs px-2 py-1 rounded font-medium ${
+                          stage.phase === 'Pilot' ? 'bg-purple-100 text-purple-700' :
+                          stage.phase === 'Expansion' ? 'bg-blue-100 text-blue-700' :
+                          stage.phase === 'Management' ? 'bg-green-100 text-green-700' :
+                          stage.phase === 'Stores' ? 'bg-amber-100 text-amber-700' :
+                          'bg-gray-100 text-gray-700'
+                        }`}>
+                          {stage.phase}
+                        </span>
+                      </div>
+                      <div className="flex gap-4 text-xs text-gray-600 mt-2">
+                        <span>👥 <strong>{formatNumber(stage.users)}</strong> total users</span>
+                        <span>📊 <strong>{(stage.dau * 100).toFixed(0)}%</strong> DAU rate</span>
+                        <span>✅ <strong>~{formatNumber(Math.round(stage.users * stage.dau))}</strong> daily active</span>
+                      </div>
+                    </div>
                   </div>
-                  <span className={`text-xs px-2 py-1 rounded font-medium ${
-                    stage.phase === 'Pilot' ? 'bg-purple-100 text-purple-700' :
-                    stage.phase === 'Expansion' ? 'bg-blue-100 text-blue-700' :
-                    stage.phase === 'Management' ? 'bg-green-100 text-green-700' :
-                    stage.phase === 'Stores' ? 'bg-amber-100 text-amber-700' :
-                    'bg-gray-100 text-gray-700'
-                  }`}>
-                    {stage.phase}
-                  </span>
-                </div>
-                <div className="flex gap-4 text-xs text-gray-600 mt-2">
-                  <span>👥 <strong>{formatNumber(stage.users)}</strong> total users</span>
-                  <span>📊 <strong>{(stage.dau * 100).toFixed(0)}%</strong> DAU rate</span>
-                  <span>✅ <strong>~{formatNumber(Math.round(stage.users * stage.dau))}</strong> daily active</span>
-                </div>
+                ))}
               </div>
-            </div>
-          ))}
-        </div>
 
-        {/* Key Strategy Notes */}
-        <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
-          <h4 className="font-semibold text-blue-900 mb-2">🎯 Onboarding Strategy Key Points:</h4>
-          <ul className="text-sm text-blue-800 space-y-1">
-            <li>• <strong>Gradual rollout</strong> over 31 months minimizes disruption and allows for learning</li>
-            <li>• <strong>DAU decreases</strong> from 45% → 28% as casual users join (expected and healthy)</li>
-            <li>• <strong>HQ first</strong> (engaged users) builds success stories before broader rollout</li>
-            <li>• <strong>Store workers last</strong> (lowest DAU) ensures infrastructure is proven at scale</li>
-          </ul>
+              {/* Key Strategy Notes */}
+              <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                <h4 className="font-semibold text-blue-900 mb-2">🎯 Onboarding Strategy Key Points:</h4>
+                <ul className="text-sm text-blue-800 space-y-1">
+                  <li>• <strong>Gradual rollout</strong> over 31 months minimizes disruption and allows for learning</li>
+                  <li>• <strong>DAU decreases</strong> from 45% → 28% as casual users join (expected and healthy)</li>
+                  <li>• <strong>HQ first</strong> (engaged users) builds success stories before broader rollout</li>
+                  <li>• <strong>Store workers last</strong> (lowest DAU) ensures infrastructure is proven at scale</li>
+                </ul>
+              </div>
+            </>
+          )}
         </div>
       </div>
 
