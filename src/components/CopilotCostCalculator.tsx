@@ -133,6 +133,32 @@ const CopilotCostCalculator: React.FC = () => {
       deployMonth: 4,
       segments: ['HQ', 'Management'],
       color: '#f59e0b'
+    },
+    {
+      id: 4,
+      name: 'Document Translation',
+      purpose: 'Translate PPT, Word, Excel documents',
+      conversationsPerDay: 0.75,
+      turns: 4,
+      generativeRatio: 0.95,
+      actions: 2.5,
+      tenantGraph: false,
+      deployMonth: 5,
+      segments: ['HQ', 'Management'],
+      color: '#22c55e'
+    },
+    {
+      id: 5,
+      name: 'Document Summarization',
+      purpose: 'Summarize PPT, Word, Excel documents',
+      conversationsPerDay: 1.5,
+      turns: 5,
+      generativeRatio: 0.85,
+      actions: 1.5,
+      tenantGraph: false,
+      deployMonth: 2,
+      segments: ['HQ', 'Management', 'Stores', 'All'],
+      color: '#ef4444'
     }
   ]);
 
