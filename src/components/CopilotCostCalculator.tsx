@@ -61,6 +61,12 @@ interface Agent {
   color: string;
 }
 
+interface AgentMonthlyCost {
+  month: number;
+  agentCosts: { agentId: number; agentName: string; cost: number; color: string }[];
+  totalCost: number;
+}
+
 const CopilotCostCalculator: React.FC = () => {
   // Stages with time-based rollout (now editable)
   const [stages, setStages] = useState<Stage[]>([
@@ -133,6 +139,32 @@ const CopilotCostCalculator: React.FC = () => {
       deployMonth: 4,
       segments: ['HQ', 'Management'],
       color: '#f59e0b'
+    },
+    {
+      id: 4,
+      name: 'Document Translation',
+      purpose: 'Translate PPT, Word, Excel documents',
+      conversationsPerDay: 0.75,
+      turns: 4,
+      generativeRatio: 0.95,
+      actions: 2.5,
+      tenantGraph: false,
+      deployMonth: 5,
+      segments: ['HQ', 'Management'],
+      color: '#22c55e'
+    },
+    {
+      id: 5,
+      name: 'Document Summarization',
+      purpose: 'Summarize PPT, Word, Excel documents',
+      conversationsPerDay: 1.5,
+      turns: 5,
+      generativeRatio: 0.85,
+      actions: 1.5,
+      tenantGraph: false,
+      deployMonth: 2,
+      segments: ['HQ', 'Management', 'Stores', 'All'],
+      color: '#ef4444'
     }
   ]);
 
@@ -375,6 +407,127 @@ const CopilotCostCalculator: React.FC = () => {
   const cheapestModel = useMemo(() => {
     return pricingSummary.reduce((min, curr) => curr.total < min.total ? curr : min);
   }, [pricingSummary]);
+
+  // Calculate agent-based monthly costs
+  const agentMonthlyCosts = useMemo((): AgentMonthlyCost[] => {
+    const costs: AgentMonthlyCost[] = [];
+    const PAYG_RATE = 0.01;
+    const DAYS_PER_MONTH = 30;
+
+    for (let month = 1; month <= 36; month++) {
+      // Find current user counts from monthlyData
+      const monthData = monthlyData[month - 1];
+      if (!monthData) continue;
+
+      const agentCosts: { agentId: number; agentName: string; cost: number; color: string }[] = [];
+      let totalCost = 0;
+
+      agents.forEach(agent => {
+        // Check if agent is deployed this month
+        if (month < agent.deployMonth) {
+          return;
+        }
+
+        // Determine which users have access based on segments
+        let eligibleUsers = 0;
+        const currentStage = stages.find(s => s.month <= month) || stages[0];
+
+        // Simplified segment calculation based on stage phase
+        if (agent.segments.includes('All')) {
+          eligibleUsers = monthData.users;
+        } else if (agent.segments.includes('Stores')) {
+          eligibleUsers = monthData.users; // Stores implies access to all
+        } else if (agent.segments.includes('Management')) {
+          // Management is available from "HQ + Mgmt" stage onwards
+          if (currentStage.phase === 'Management' || currentStage.phase === 'Stores' || currentStage.phase === 'Enterprise') {
+            eligibleUsers = monthData.users;
+          } else if (currentStage.phase === 'Expansion') {
+            eligibleUsers = Math.round(monthData.users * 0.4); // Partial management access
+          }
+        } else if (agent.segments.includes('HQ')) {
+          // HQ only
+          if (currentStage.phase === 'Pilot' || currentStage.phase === 'Expansion') {
+            eligibleUsers = monthData.users;
+          } else {
+            eligibleUsers = Math.round(monthData.users * 0.15); // HQ is ~15% of total
+          }
+        }
+
+        // Calculate costs for this agent
+        const activeUsers = Math.round(eligibleUsers * monthData.dau);
+        const creditsPerConv = calculateAgentCredits(agent);
+        const monthlyConversations = activeUsers * agent.conversationsPerDay * DAYS_PER_MONTH;
+        const monthlyCredits = monthlyConversations * creditsPerConv;
+        const monthlyCost = monthlyCredits * PAYG_RATE;
+
+        agentCosts.push({
+          agentId: agent.id,
+          agentName: agent.name,
+          cost: Math.round(monthlyCost),
+          color: agent.color
+        });
+
+        totalCost += monthlyCost;
+      });
+
+      costs.push({
+        month,
+        agentCosts,
+        totalCost: Math.round(totalCost)
+      });
+    }
+
+    return costs;
+  }, [agents, monthlyData, stages]);
+
+  // Calculate 3-year agent cost summary
+  const agent3YearSummary = useMemo(() => {
+    const summary = agents.map(agent => {
+      let year1 = 0, year2 = 0, year3 = 0;
+
+      agentMonthlyCosts.forEach(({ month, agentCosts }) => {
+        const agentCost = agentCosts.find(ac => ac.agentId === agent.id);
+        if (!agentCost) return;
+
+        if (month <= 12) year1 += agentCost.cost;
+        else if (month <= 24) year2 += agentCost.cost;
+        else year3 += agentCost.cost;
+      });
+
+      return {
+        agent,
+        year1,
+        year2,
+        year3,
+        total: year1 + year2 + year3
+      };
+    });
+
+    return summary;
+  }, [agents, agentMonthlyCosts]);
+
+  // Calculate licensing impact based on agent portfolio
+  const licensingImpact = useMemo(() => {
+    const BREAKEVEN_CREDITS = 3000;
+
+    // Calculate average credits per user per month from agent portfolio
+    const totalAgentCredits = agents.reduce((sum, agent) => {
+      const creditsPerConv = calculateAgentCredits(agent);
+      return sum + (agent.conversationsPerDay * creditsPerConv * 30);
+    }, 0);
+
+    const avgCreditsPerUserMonth = totalAgentCredits;
+    const breakevenMonth = agentMonthlyCosts.findIndex(mc =>
+      mc.totalCost > 0 && (mc.totalCost / (monthlyData[mc.month - 1]?.activeUsers || 1) * 1) >= (BREAKEVEN_CREDITS * 0.01)
+    ) + 1;
+
+    return {
+      avgCreditsPerUserMonth: Math.round(avgCreditsPerUserMonth),
+      breakevenMonth: breakevenMonth || null,
+      recommendM365: avgCreditsPerUserMonth > BREAKEVEN_CREDITS,
+      monthlyCostPerUser: Math.round(avgCreditsPerUserMonth * 0.01)
+    };
+  }, [agents, agentMonthlyCosts, monthlyData]);
 
   // Helper functions
   const formatCurrency = (value: number): string => `$${value.toLocaleString()}`;
@@ -1185,6 +1338,330 @@ const CopilotCostCalculator: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Cost Breakdown by Agent (Monthly, PAYG Pricing) */}
+      {showAgentPortfolio && agents.length > 0 && (
+        <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
+          <h2 className="text-xl font-bold text-gray-900 mb-4">
+            Cost Breakdown by Agent (Monthly, PAYG Pricing)
+          </h2>
+
+          <div className="mb-6">
+            <p className="text-sm text-gray-600 mb-4">
+              This shows the actual monthly cost in dollars for each agent, accounting for deployment timing and user segment access.
+            </p>
+
+            {/* Chart: Agent Monthly Costs */}
+            <ResponsiveContainer width="100%" height={400}>
+              <LineChart
+                data={agentMonthlyCosts}
+                margin={{ top: 20, right: 30, left: 60, bottom: 60 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis
+                  dataKey="month"
+                  label={{ value: 'Month', position: 'insideBottom', offset: -10 }}
+                />
+                <YAxis
+                  label={{ value: 'Monthly Cost ($)', angle: -90, position: 'insideLeft', offset: 10 }}
+                  tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
+                />
+                <Tooltip
+                  formatter={(value: number) => formatCurrency(value)}
+                  labelFormatter={(month: number) => `Month ${month}`}
+                />
+                <Legend
+                  verticalAlign="top"
+                  height={36}
+                  wrapperStyle={{ paddingBottom: '10px' }}
+                />
+                {agents.map(agent => (
+                  <Line
+                    key={agent.id}
+                    type="monotone"
+                    dataKey={(data: AgentMonthlyCost) => {
+                      const agentCost = data.agentCosts.find(ac => ac.agentId === agent.id);
+                      return agentCost?.cost || 0;
+                    }}
+                    stroke={agent.color}
+                    strokeWidth={2}
+                    name={agent.name}
+                    dot={false}
+                  />
+                ))}
+                <Line
+                  type="monotone"
+                  dataKey="totalCost"
+                  stroke="#000000"
+                  strokeWidth={3}
+                  strokeDasharray="5 5"
+                  name="Total Portfolio Cost"
+                  dot={false}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* Sample Month Breakdown Table */}
+          <div className="bg-gray-50 rounded-lg p-4">
+            <h3 className="font-semibold text-gray-900 mb-3">Month 12 Cost Breakdown (Example)</h3>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-200">
+                  <tr>
+                    <th className="p-3 text-left">Agent</th>
+                    <th className="p-3 text-right">Deploy Month</th>
+                    <th className="p-3 text-right">Credits/Conv</th>
+                    <th className="p-3 text-right">Monthly Cost</th>
+                    <th className="p-3 text-right">% of Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {agentMonthlyCosts[11]?.agentCosts
+                    .sort((a, b) => b.cost - a.cost)
+                    .map(agentCost => {
+                      const agent = agents.find(a => a.id === agentCost.agentId);
+                      if (!agent) return null;
+                      const percentage = ((agentCost.cost / agentMonthlyCosts[11].totalCost) * 100).toFixed(1);
+                      return (
+                        <tr key={agentCost.agentId} className="border-b hover:bg-gray-100">
+                          <td className="p-3">
+                            <div className="flex items-center gap-2">
+                              <div className="w-3 h-3 rounded-full" style={{ backgroundColor: agentCost.color }}></div>
+                              <span className="font-medium">{agentCost.agentName}</span>
+                            </div>
+                          </td>
+                          <td className="p-3 text-right">Month {agent.deployMonth}</td>
+                          <td className="p-3 text-right font-mono">{calculateAgentCredits(agent).toFixed(1)}</td>
+                          <td className="p-3 text-right font-mono">{formatCurrency(agentCost.cost)}</td>
+                          <td className="p-3 text-right">{percentage}%</td>
+                        </tr>
+                      );
+                    })}
+                  <tr className="bg-gray-200 font-bold">
+                    <td className="p-3" colSpan={3}>Total Portfolio Cost (Month 12)</td>
+                    <td className="p-3 text-right">{formatCurrency(agentMonthlyCosts[11]?.totalCost || 0)}</td>
+                    <td className="p-3 text-right">100%</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Impact on Licensing Options */}
+      {showAgentPortfolio && agents.length > 0 && (
+        <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
+          <h2 className="text-xl font-bold text-gray-900 mb-4">
+            Impact on Licensing Options
+          </h2>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+            {/* Key Metrics */}
+            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg p-5 border-2 border-blue-200">
+              <h3 className="font-semibold text-blue-900 mb-3">📊 Portfolio Metrics</h3>
+              <div className="space-y-3">
+                <div className="bg-white rounded p-3">
+                  <div className="text-sm text-gray-600">Avg Credits/User/Month</div>
+                  <div className="text-2xl font-bold text-blue-900">{formatNumber(licensingImpact.avgCreditsPerUserMonth)}</div>
+                  <div className="text-xs text-gray-500 mt-1">From all {agents.length} agents combined</div>
+                </div>
+                <div className="bg-white rounded p-3">
+                  <div className="text-sm text-gray-600">Monthly Cost/User (PAYG)</div>
+                  <div className="text-2xl font-bold text-blue-900">${licensingImpact.monthlyCostPerUser}</div>
+                  <div className="text-xs text-gray-500 mt-1">At $0.01 per credit</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Breakeven Analysis */}
+            <div className={`rounded-lg p-5 border-2 ${
+              licensingImpact.recommendM365
+                ? 'bg-gradient-to-br from-green-50 to-emerald-50 border-green-300'
+                : 'bg-gradient-to-br from-yellow-50 to-orange-50 border-yellow-300'
+            }`}>
+              <h3 className={`font-semibold mb-3 ${
+                licensingImpact.recommendM365 ? 'text-green-900' : 'text-yellow-900'
+              }`}>
+                💡 Licensing Recommendation
+              </h3>
+              <div className="space-y-3">
+                <div className="bg-white rounded p-3">
+                  <div className="text-sm text-gray-600">Breakeven Threshold</div>
+                  <div className="text-2xl font-bold text-gray-900">3,000 credits/month</div>
+                  <div className="text-xs text-gray-500 mt-1">M365 Copilot = $30/user/month</div>
+                </div>
+                <div className="bg-white rounded p-3">
+                  <div className="text-sm font-semibold mb-2">
+                    {licensingImpact.recommendM365 ? '✅ Recommendation: M365 Copilot' : '✅ Recommendation: PAYG'}
+                  </div>
+                  <p className="text-xs text-gray-700">
+                    {licensingImpact.recommendM365
+                      ? `Your portfolio averages ${formatNumber(licensingImpact.avgCreditsPerUserMonth)} credits/user/month, which is above the 3,000 credit breakeven. M365 Copilot licenses are more cost-effective.`
+                      : `Your portfolio averages ${formatNumber(licensingImpact.avgCreditsPerUserMonth)} credits/user/month, which is below the 3,000 credit breakeven. Stay on PAYG for better value.`
+                    }
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Detailed Guidance */}
+          <div className="bg-gray-50 rounded-lg p-5 border border-gray-200">
+            <h3 className="font-semibold text-gray-900 mb-3">🎯 Strategic Licensing Guidance</h3>
+            <div className="space-y-3 text-sm text-gray-700">
+              <div className="flex items-start gap-3">
+                <span className="text-blue-600 font-bold mt-1">1.</span>
+                <div>
+                  <strong className="text-gray-900">Monitor Usage by Segment:</strong>
+                  <p className="text-gray-600 mt-1">
+                    HQ users with access to all {agents.length} agents may reach breakeven faster than Store workers with limited agent access.
+                    Consider hybrid licensing: M365 for power users (HQ/Management), PAYG for occasional users (Stores).
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3">
+                <span className="text-blue-600 font-bold mt-1">2.</span>
+                <div>
+                  <strong className="text-gray-900">Phased Approach:</strong>
+                  <p className="text-gray-600 mt-1">
+                    Start with PAYG in early months to establish actual usage patterns. Switch high-consumption users to M365 licenses
+                    when their monthly credits consistently exceed 3,000 for 3+ months.
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3">
+                <span className="text-blue-600 font-bold mt-1">3.</span>
+                <div>
+                  <strong className="text-gray-900">Agent Deployment Impact:</strong>
+                  <p className="text-gray-600 mt-1">
+                    As new agents deploy (Translation in Month {agents.find(a => a.name.includes('Translation'))?.deployMonth || 5},
+                    etc.), credits per user will increase. Reassess licensing decisions quarterly as portfolio grows.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Agent Cost Analysis (3-Year Total) */}
+      {showAgentPortfolio && agents.length > 0 && (
+        <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
+          <h2 className="text-xl font-bold text-gray-900 mb-4">
+            Agent Cost Analysis (3-Year Total)
+          </h2>
+
+          <div className="mb-6">
+            <p className="text-sm text-gray-600 mb-4">
+              Long-term cost projection showing how your agent portfolio costs evolve over 36 months with phased deployment.
+            </p>
+
+            {/* 3-Year Summary Table */}
+            <div className="overflow-x-auto mb-6">
+              <table className="w-full text-sm">
+                <thead className="bg-gradient-to-r from-blue-100 to-indigo-100">
+                  <tr>
+                    <th className="p-3 text-left">Agent</th>
+                    <th className="p-3 text-right">Deploy Month</th>
+                    <th className="p-3 text-right">Year 1</th>
+                    <th className="p-3 text-right">Year 2</th>
+                    <th className="p-3 text-right">Year 3</th>
+                    <th className="p-3 text-right">3-Year Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {agent3YearSummary
+                    .sort((a, b) => b.total - a.total)
+                    .map(({ agent, year1, year2, year3, total }) => (
+                      <tr key={agent.id} className="border-b hover:bg-gray-50">
+                        <td className="p-3">
+                          <div className="flex items-center gap-2">
+                            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: agent.color }}></div>
+                            <span className="font-medium">{agent.name}</span>
+                          </div>
+                        </td>
+                        <td className="p-3 text-right">Month {agent.deployMonth}</td>
+                        <td className="p-3 text-right font-mono">{formatCurrency(year1)}</td>
+                        <td className="p-3 text-right font-mono">{formatCurrency(year2)}</td>
+                        <td className="p-3 text-right font-mono">{formatCurrency(year3)}</td>
+                        <td className="p-3 text-right font-mono font-bold text-blue-900">{formatCurrency(total)}</td>
+                      </tr>
+                    ))}
+                  <tr className="bg-gradient-to-r from-blue-100 to-indigo-100 font-bold">
+                    <td className="p-3" colSpan={2}>Total Portfolio Cost</td>
+                    <td className="p-3 text-right">
+                      {formatCurrency(agent3YearSummary.reduce((sum, a) => sum + a.year1, 0))}
+                    </td>
+                    <td className="p-3 text-right">
+                      {formatCurrency(agent3YearSummary.reduce((sum, a) => sum + a.year2, 0))}
+                    </td>
+                    <td className="p-3 text-right">
+                      {formatCurrency(agent3YearSummary.reduce((sum, a) => sum + a.year3, 0))}
+                    </td>
+                    <td className="p-3 text-right text-blue-900">
+                      {formatCurrency(agent3YearSummary.reduce((sum, a) => sum + a.total, 0))}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            {/* Key Insights */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-200 rounded-lg p-4">
+                <div className="text-sm text-green-700 font-semibold mb-1">Year 1 Cost</div>
+                <div className="text-2xl font-bold text-green-900">
+                  {formatCurrency(agent3YearSummary.reduce((sum, a) => sum + a.year1, 0))}
+                </div>
+                <div className="text-xs text-green-700 mt-2">
+                  Initial deployment phase - {agents.filter(a => a.deployMonth <= 12).length} agents deployed
+                </div>
+              </div>
+
+              <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-lg p-4">
+                <div className="text-sm text-blue-700 font-semibold mb-1">Year 2 Cost</div>
+                <div className="text-2xl font-bold text-blue-900">
+                  {formatCurrency(agent3YearSummary.reduce((sum, a) => sum + a.year2, 0))}
+                </div>
+                <div className="text-xs text-blue-700 mt-2">
+                  Full portfolio + user growth - All {agents.length} agents active
+                </div>
+              </div>
+
+              <div className="bg-gradient-to-br from-purple-50 to-pink-50 border-2 border-purple-200 rounded-lg p-4">
+                <div className="text-sm text-purple-700 font-semibold mb-1">Year 3 Cost</div>
+                <div className="text-2xl font-bold text-purple-900">
+                  {formatCurrency(agent3YearSummary.reduce((sum, a) => sum + a.year3, 0))}
+                </div>
+                <div className="text-xs text-purple-700 mt-2">
+                  Steady state - {formatNumber(monthlyData[35]?.users || 0)} users at {(monthlyData[35]?.dau * 100 || 0).toFixed(0)}% DAU
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Comparison to Main Models */}
+          <div className="bg-yellow-50 border-2 border-yellow-300 rounded-lg p-5">
+            <h3 className="font-semibold text-yellow-900 mb-3">📊 Comparison: Agent Portfolio vs Main Calculator</h3>
+            <div className="text-sm text-yellow-800 space-y-2">
+              <p>
+                <strong>Agent Portfolio 3-Year Total:</strong> {formatCurrency(agent3YearSummary.reduce((sum, a) => sum + a.total, 0))}
+                <span className="ml-2 text-xs">(PAYG, actual agent usage)</span>
+              </p>
+              <p>
+                <strong>Main Calculator Best Model:</strong> {cheapestModel.model} = {formatCurrency(cheapestModel.total)}
+                <span className="ml-2 text-xs">(Based on average usage parameters)</span>
+              </p>
+              <p className="pt-2 border-t border-yellow-300 mt-3">
+                💡 <strong>Insight:</strong> The agent portfolio provides detailed per-agent costs based on actual deployment timing and segment access,
+                while the main calculator shows overall costs across different licensing strategies. Use both views together for complete planning.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Cost Optimization Tips */}
       <div className="bg-white rounded-lg shadow-lg p-6">
