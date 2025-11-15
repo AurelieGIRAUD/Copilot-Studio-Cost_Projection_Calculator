@@ -1,288 +1,614 @@
 import React, { useState, useMemo, ChangeEvent } from 'react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import {
-  calculateMonthlyData,
-  calculateScenarioComparison,
-  validateNumber,
-  formatCurrency,
-  formatNumber,
-  BREAKEVEN_CREDITS,
-  type ScenarioData
-} from '../utils/calculations';
+import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from 'recharts';
+
+// Interfaces
+interface Stage {
+  name: string;
+  users: number;
+  month: number;
+  dau: number;
+  phase: string;
+}
+
+interface Config {
+  conversationsPerDay: number;
+  turnsPerConversation: number;
+  generativeRatio: number;
+  actionsPerConversation: number;
+  peakMultiplier: number;
+  m365CopilotPrice: number;
+  autonomousActionRatio: number;
+  hybridM365Users: number;
+}
+
+interface MonthlyData {
+  month: number;
+  year: string;
+  users: number;
+  dau: number;
+  activeUsers: number;
+  conversations: number;
+  credits: number;
+  paygCost: number;
+  p3Cost: number;
+  paygM365Cost: number;
+  p3M365Cost: number;
+  m365AllCost: number;
+}
+
+interface PricingSummary {
+  model: string;
+  year1: number;
+  year2: number;
+  year3: number;
+  total: number;
+  color: string;
+}
 
 const CopilotCostCalculator: React.FC = () => {
-  const [userCount, setUserCount] = useState<number>(130);
-  // Note: agentCount is used for scenario categorization in the comparison table
-  // Future enhancement: could factor agent count into credit consumption calculations
-  const [agentCount, setAgentCount] = useState<number>(10);
-  const [complexityRatio, setComplexityRatio] = useState<string>('80/20');
+  // Stages with time-based rollout
+  const [stages] = useState<Stage[]>([
+    { name: 'Pilot (HQ)', users: 130, month: 1, dau: 0.45, phase: 'Pilot' },
+    { name: 'HQ Expansion', users: 500, month: 4, dau: 0.40, phase: 'Expansion' },
+    { name: 'Full HQ', users: 1000, month: 7, dau: 0.38, phase: 'Expansion' },
+    { name: 'HQ + Mgmt', users: 2500, month: 10, dau: 0.35, phase: 'Management' },
+    { name: 'All Mgmt', users: 6000, month: 13, dau: 0.33, phase: 'Management' },
+    { name: 'Mgmt + Stores', users: 12000, month: 19, dau: 0.30, phase: 'Stores' },
+    { name: 'Near-Complete', users: 30000, month: 31, dau: 0.28, phase: 'Enterprise' }
+  ]);
+
+  // Configuration parameters with sliders
+  const [config, setConfig] = useState<Config>({
+    conversationsPerDay: 4,
+    turnsPerConversation: 5,
+    generativeRatio: 0.70,
+    actionsPerConversation: 1.5,
+    peakMultiplier: 1.4,
+    m365CopilotPrice: 30,
+    autonomousActionRatio: 0.15,
+    hybridM365Users: 200
+  });
+
   const [showAdvanced, setShowAdvanced] = useState<boolean>(false);
 
-  // Advanced settings
-  const [simpleCreditsPerUser, setSimpleCreditsPerUser] = useState<number>(75);
-  const [complexCreditsPerUser, setComplexCreditsPerUser] = useState<number>(600);
-  const [year1GrowthRate, setYear1GrowthRate] = useState<number>(15);
-  const [adoptionCeiling, setAdoptionCeiling] = useState<number>(80);
-  const [steadyStateAdoption, setSteadyStateAdoption] = useState<number>(60); // For scenario comparison
-
-  // Validation constraints
-  const VALIDATION = {
-    credits: { min: 0, max: 10000 },
-    percentage: { min: 0, max: 100 }
+  // Parameter ranges with market research guidance
+  const parameterRanges = {
+    conversationsPerDay: {
+      min: 1, max: 12, default: 4, step: 1,
+      low: "1-2 (Store workers, simple lookups)",
+      medium: "3-5 (Office workers, moderate usage)",
+      high: "6-12 (Power users, heavy daily usage)"
+    },
+    turnsPerConversation: {
+      min: 2, max: 10, default: 5, step: 1,
+      low: "2-3 (Quick queries)",
+      medium: "4-6 (Standard interactions)",
+      high: "7-10 (Complex problem-solving)"
+    },
+    generativeRatio: {
+      min: 0, max: 100, default: 70, step: 5,
+      low: "20-40% (Mostly classic responses)",
+      medium: "50-70% (Balanced approach)",
+      high: "80-100% (AI-first strategy)"
+    },
+    actionsPerConversation: {
+      min: 0, max: 5, default: 1.5, step: 0.5,
+      low: "0-1 (Information only)",
+      medium: "1-2 (Some automation)",
+      high: "3-5 (Action-heavy workflows)"
+    },
+    m365CopilotPrice: {
+      min: 25, max: 35, default: 30, step: 1,
+      low: "$25-27 (Negotiated discount)",
+      medium: "$28-32 (Standard pricing)",
+      high: "$33-35 (List price)"
+    },
+    autonomousActionRatio: {
+      min: 0, max: 50, default: 15, step: 5,
+      low: "0-10% (User-triggered only)",
+      medium: "10-20% (Some automation)",
+      high: "25-50% (Highly autonomous)"
+    }
   };
 
-  const userScenarios: number[] = [130, 500, 1000, 2500, 6000, 12000, 30000];
-  const agentScenarios: number[] = [10, 30, 100];
-  const complexityScenarios: string[] = ['80/20', '70/30', '50/50'];
+  // Calculate credits per conversation
+  const creditsPerConversation = useMemo(() => {
+    const classicTurns = config.turnsPerConversation * (1 - config.generativeRatio);
+    const generativeTurns = config.turnsPerConversation * config.generativeRatio;
+    const classicCredits = classicTurns * 1;
+    const generativeCredits = generativeTurns * 2;
+    const actionCredits = config.actionsPerConversation * 5;
+    return classicCredits + generativeCredits + actionCredits;
+  }, [config.turnsPerConversation, config.generativeRatio, config.actionsPerConversation]);
 
-  const monthlyData = useMemo(() => calculateMonthlyData({
-    userCount,
-    complexityRatio,
-    simpleCreditsPerUser,
-    complexCreditsPerUser,
-    year1GrowthRate,
-    adoptionCeiling,
-    steadyStateAdoption
-  }), [
-    userCount, complexityRatio, simpleCreditsPerUser,
-    complexCreditsPerUser, year1GrowthRate, adoptionCeiling, steadyStateAdoption
-  ]);
+  // Linear interpolation between stages
+  const interpolateValue = (month: number, stagesBefore: Stage[], stagesAfter: Stage[], getValue: (stage: Stage) => number): number => {
+    const beforeStage = stagesBefore[stagesBefore.length - 1];
+    const afterStage = stagesAfter[0];
 
-  const scenarioData = useMemo(() => calculateScenarioComparison(
-    userScenarios,
-    agentScenarios,
-    complexityScenarios,
-    simpleCreditsPerUser,
-    complexCreditsPerUser,
-    steadyStateAdoption
-  ), [
-    simpleCreditsPerUser, complexCreditsPerUser, steadyStateAdoption
-  ]);
+    if (!beforeStage) return getValue(afterStage);
+    if (!afterStage) return getValue(beforeStage);
 
-  const currentScenario: ScenarioData | undefined = scenarioData.find(
-    (s: ScenarioData) => s.users === userCount && s.agents === agentCount && s.ratio === complexityRatio
-  );
+    const monthRange = afterStage.month - beforeStage.month;
+    const monthProgress = month - beforeStage.month;
+    const ratio = monthProgress / monthRange;
+
+    const beforeValue = getValue(beforeStage);
+    const afterValue = getValue(afterStage);
+
+    return beforeValue + (afterValue - beforeValue) * ratio;
+  };
+
+  // Calculate monthly projections over 36 months
+  const monthlyData = useMemo((): MonthlyData[] => {
+    const data: MonthlyData[] = [];
+    const workingDaysPerMonth = 22;
+
+    for (let month = 1; month <= 36; month++) {
+      // Find stages before and after this month
+      const stagesBefore = stages.filter(s => s.month <= month);
+      const stagesAfter = stages.filter(s => s.month > month);
+
+      // Interpolate users and DAU
+      const users = Math.round(interpolateValue(month, stagesBefore, stagesAfter, s => s.users));
+      const dau = interpolateValue(month, stagesBefore, stagesAfter, s => s.dau);
+      const activeUsers = Math.round(users * dau);
+
+      // Check if this is a peak month (every 6 months)
+      const isPeakMonth = month % 6 === 0;
+      const multiplier = isPeakMonth ? config.peakMultiplier : 1.0;
+
+      // Calculate conversations and credits
+      const conversations = activeUsers * config.conversationsPerDay * workingDaysPerMonth * multiplier;
+      const totalCredits = conversations * creditsPerConversation;
+
+      // Pricing calculations
+      const paygRate = 0.01;
+      const p3Discount = 0.15;
+
+      // Model 1: PAYG Alone
+      const paygCost = totalCredits * paygRate;
+
+      // Model 2: P3 Pre-Purchase (15% discount)
+      const p3Cost = totalCredits * paygRate * (1 - p3Discount);
+
+      // Model 3: PAYG + M365 Licenses (hybrid)
+      // M365 users only pay for autonomous actions
+      const m365Users = Math.min(config.hybridM365Users, users);
+      const paygUsers = users - m365Users;
+      const m365ActiveUsers = Math.round(m365Users * dau);
+      const paygActiveUsers = Math.round(paygUsers * dau);
+
+      const m365Conversations = m365ActiveUsers * config.conversationsPerDay * workingDaysPerMonth * multiplier;
+      const paygConversations = paygActiveUsers * config.conversationsPerDay * workingDaysPerMonth * multiplier;
+
+      // M365 users: only autonomous actions incur credits
+      const m365AutonomousCredits = m365Conversations * config.actionsPerConversation * config.autonomousActionRatio * 5;
+      const paygCredits = paygConversations * creditsPerConversation;
+
+      const paygM365Cost = (m365Users * config.m365CopilotPrice) + ((m365AutonomousCredits + paygCredits) * paygRate);
+
+      // Model 4: P3 + M365 Licenses (hybrid with discount)
+      const p3M365Cost = (m365Users * config.m365CopilotPrice) + ((m365AutonomousCredits + paygCredits) * paygRate * (1 - p3Discount));
+
+      // Model 5: M365 Copilot for All
+      const m365AllCost = users * config.m365CopilotPrice;
+
+      data.push({
+        month,
+        year: month <= 12 ? 'Year 1' : month <= 24 ? 'Year 2' : 'Year 3',
+        users,
+        dau,
+        activeUsers,
+        conversations: Math.round(conversations),
+        credits: Math.round(totalCredits),
+        paygCost: Math.round(paygCost),
+        p3Cost: Math.round(p3Cost),
+        paygM365Cost: Math.round(paygM365Cost),
+        p3M365Cost: Math.round(p3M365Cost),
+        m365AllCost: Math.round(m365AllCost)
+      });
+    }
+
+    return data;
+  }, [stages, config, creditsPerConversation]);
+
+  // Calculate 3-year summary
+  const pricingSummary = useMemo((): PricingSummary[] => {
+    const year1Data = monthlyData.slice(0, 12);
+    const year2Data = monthlyData.slice(12, 24);
+    const year3Data = monthlyData.slice(24, 36);
+
+    const sum = (data: MonthlyData[], key: keyof MonthlyData): number =>
+      data.reduce((acc, m) => acc + (m[key] as number), 0);
+
+    const models = [
+      {
+        model: 'PAYG Alone',
+        year1: sum(year1Data, 'paygCost'),
+        year2: sum(year2Data, 'paygCost'),
+        year3: sum(year3Data, 'paygCost'),
+        color: '#3b82f6' // blue
+      },
+      {
+        model: 'P3 Pre-Purchase (15% discount)',
+        year1: sum(year1Data, 'p3Cost'),
+        year2: sum(year2Data, 'p3Cost'),
+        year3: sum(year3Data, 'p3Cost'),
+        color: '#8b5cf6' // violet
+      },
+      {
+        model: 'PAYG + M365 Licenses',
+        year1: sum(year1Data, 'paygM365Cost'),
+        year2: sum(year2Data, 'paygM365Cost'),
+        year3: sum(year3Data, 'paygM365Cost'),
+        color: '#10b981' // green
+      },
+      {
+        model: 'P3 + M365 Licenses',
+        year1: sum(year1Data, 'p3M365Cost'),
+        year2: sum(year2Data, 'p3M365Cost'),
+        year3: sum(year3Data, 'p3M365Cost'),
+        color: '#f59e0b' // amber
+      },
+      {
+        model: 'M365 Copilot for All',
+        year1: sum(year1Data, 'm365AllCost'),
+        year2: sum(year2Data, 'm365AllCost'),
+        year3: sum(year3Data, 'm365AllCost'),
+        color: '#ef4444' // red
+      }
+    ];
+
+    return models.map(m => ({
+      ...m,
+      total: m.year1 + m.year2 + m.year3
+    }));
+  }, [monthlyData]);
+
+  // Find cheapest model
+  const cheapestModel = useMemo(() => {
+    return pricingSummary.reduce((min, curr) => curr.total < min.total ? curr : min);
+  }, [pricingSummary]);
+
+  // Helper functions
+  const formatCurrency = (value: number): string => `$${value.toLocaleString()}`;
+  const formatNumber = (value: number): string => value.toLocaleString();
+
+  const updateConfig = (key: keyof Config, value: number) => {
+    setConfig(prev => ({ ...prev, [key]: value }));
+  };
 
   return (
     <div className="w-full max-w-7xl mx-auto p-6 bg-gray-50">
+      {/* Header */}
       <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
         <h1 className="text-3xl font-bold text-blue-900 mb-2">
           Copilot Studio Cost Projection Calculator
         </h1>
         <p className="text-gray-600 mb-4">
-          Interactive 2-year projection with scenario analysis for pay-as-you-go vs M365 Copilot licensing
+          Interactive 3-year cost projection with usage-based modeling and 5 pricing strategies
         </p>
 
         <div className="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6">
           <p className="text-sm text-blue-900">
-            <strong>Latest Pricing (Nov 2025):</strong> Pay-as-you-go at $0.01/credit •
-            Prepaid packs $200/month (25k credits) • M365 Copilot $30/user/month
+            <strong>Usage-Based Model:</strong> {creditsPerConversation.toFixed(1)} credits/conversation •
+            Classic turns (1 credit) • Generative turns (2 credits) • Actions (5 credits each)
           </p>
         </div>
 
-        {/* Main Controls */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">
-              Number of Users
-            </label>
-            <select
-              value={userCount}
-              onChange={(e: ChangeEvent<HTMLSelectElement>) => setUserCount(parseInt(e.target.value))}
-              className="w-full p-2 border rounded-lg bg-white"
-            >
-              {userScenarios.map(count => (
-                <option key={count} value={count}>{formatNumber(count)} users</option>
-              ))}
-            </select>
+        {/* Parameter Sliders */}
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Conversations per Day */}
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <label className="block text-sm font-semibold text-gray-700">
+                  Conversations per Day
+                </label>
+                <div className="group relative">
+                  <svg className="w-4 h-4 text-blue-500 cursor-help" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                  </svg>
+                  <div className="hidden group-hover:block absolute z-10 w-64 p-2 mt-1 text-xs bg-gray-900 text-white rounded shadow-lg">
+                    <div><strong>Low:</strong> {parameterRanges.conversationsPerDay.low}</div>
+                    <div><strong>Medium:</strong> {parameterRanges.conversationsPerDay.medium}</div>
+                    <div><strong>High:</strong> {parameterRanges.conversationsPerDay.high}</div>
+                  </div>
+                </div>
+              </div>
+              <input
+                type="range"
+                min={parameterRanges.conversationsPerDay.min}
+                max={parameterRanges.conversationsPerDay.max}
+                step={parameterRanges.conversationsPerDay.step}
+                value={config.conversationsPerDay}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => updateConfig('conversationsPerDay', parseFloat(e.target.value))}
+                className="w-full"
+              />
+              <div className="flex justify-between text-sm text-gray-600 mt-1">
+                <span>{parameterRanges.conversationsPerDay.min}</span>
+                <span className="font-semibold">{config.conversationsPerDay}</span>
+                <span>{parameterRanges.conversationsPerDay.max}</span>
+              </div>
+            </div>
+
+            {/* Turns per Conversation */}
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <label className="block text-sm font-semibold text-gray-700">
+                  Turns per Conversation
+                </label>
+                <div className="group relative">
+                  <svg className="w-4 h-4 text-blue-500 cursor-help" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                  </svg>
+                  <div className="hidden group-hover:block absolute z-10 w-64 p-2 mt-1 text-xs bg-gray-900 text-white rounded shadow-lg">
+                    <div><strong>Low:</strong> {parameterRanges.turnsPerConversation.low}</div>
+                    <div><strong>Medium:</strong> {parameterRanges.turnsPerConversation.medium}</div>
+                    <div><strong>High:</strong> {parameterRanges.turnsPerConversation.high}</div>
+                  </div>
+                </div>
+              </div>
+              <input
+                type="range"
+                min={parameterRanges.turnsPerConversation.min}
+                max={parameterRanges.turnsPerConversation.max}
+                step={parameterRanges.turnsPerConversation.step}
+                value={config.turnsPerConversation}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => updateConfig('turnsPerConversation', parseFloat(e.target.value))}
+                className="w-full"
+              />
+              <div className="flex justify-between text-sm text-gray-600 mt-1">
+                <span>{parameterRanges.turnsPerConversation.min}</span>
+                <span className="font-semibold">{config.turnsPerConversation}</span>
+                <span>{parameterRanges.turnsPerConversation.max}</span>
+              </div>
+            </div>
+
+            {/* Generative AI Ratio */}
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <label className="block text-sm font-semibold text-gray-700">
+                  Generative AI Ratio (%)
+                </label>
+                <div className="group relative">
+                  <svg className="w-4 h-4 text-blue-500 cursor-help" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                  </svg>
+                  <div className="hidden group-hover:block absolute z-10 w-64 p-2 mt-1 text-xs bg-gray-900 text-white rounded shadow-lg">
+                    <div><strong>Low:</strong> {parameterRanges.generativeRatio.low}</div>
+                    <div><strong>Medium:</strong> {parameterRanges.generativeRatio.medium}</div>
+                    <div><strong>High:</strong> {parameterRanges.generativeRatio.high}</div>
+                  </div>
+                </div>
+              </div>
+              <input
+                type="range"
+                min={parameterRanges.generativeRatio.min}
+                max={parameterRanges.generativeRatio.max}
+                step={parameterRanges.generativeRatio.step}
+                value={config.generativeRatio * 100}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => updateConfig('generativeRatio', parseFloat(e.target.value) / 100)}
+                className="w-full"
+              />
+              <div className="flex justify-between text-sm text-gray-600 mt-1">
+                <span>{parameterRanges.generativeRatio.min}%</span>
+                <span className="font-semibold">{(config.generativeRatio * 100).toFixed(0)}%</span>
+                <span>{parameterRanges.generativeRatio.max}%</span>
+              </div>
+            </div>
+
+            {/* Actions per Conversation */}
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <label className="block text-sm font-semibold text-gray-700">
+                  Actions per Conversation
+                </label>
+                <div className="group relative">
+                  <svg className="w-4 h-4 text-blue-500 cursor-help" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                  </svg>
+                  <div className="hidden group-hover:block absolute z-10 w-64 p-2 mt-1 text-xs bg-gray-900 text-white rounded shadow-lg">
+                    <div><strong>Low:</strong> {parameterRanges.actionsPerConversation.low}</div>
+                    <div><strong>Medium:</strong> {parameterRanges.actionsPerConversation.medium}</div>
+                    <div><strong>High:</strong> {parameterRanges.actionsPerConversation.high}</div>
+                  </div>
+                </div>
+              </div>
+              <input
+                type="range"
+                min={parameterRanges.actionsPerConversation.min}
+                max={parameterRanges.actionsPerConversation.max}
+                step={parameterRanges.actionsPerConversation.step}
+                value={config.actionsPerConversation}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => updateConfig('actionsPerConversation', parseFloat(e.target.value))}
+                className="w-full"
+              />
+              <div className="flex justify-between text-sm text-gray-600 mt-1">
+                <span>{parameterRanges.actionsPerConversation.min}</span>
+                <span className="font-semibold">{config.actionsPerConversation.toFixed(1)}</span>
+                <span>{parameterRanges.actionsPerConversation.max}</span>
+              </div>
+            </div>
           </div>
 
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">
-              Number of Agents
-            </label>
-            <select
-              value={agentCount}
-              onChange={(e: ChangeEvent<HTMLSelectElement>) => setAgentCount(parseInt(e.target.value))}
-              className="w-full p-2 border rounded-lg bg-white"
-            >
-              {agentScenarios.map(count => (
-                <option key={count} value={count}>{count} agents</option>
-              ))}
-            </select>
-          </div>
+          {/* Advanced Settings Toggle */}
+          <button
+            onClick={() => setShowAdvanced(!showAdvanced)}
+            className="text-blue-600 hover:text-blue-800 font-medium"
+          >
+            {showAdvanced ? '▼' : '▶'} Advanced Settings
+          </button>
 
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">
-              Agent Complexity (Simple/Complex)
-            </label>
-            <select
-              value={complexityRatio}
-              onChange={(e: ChangeEvent<HTMLSelectElement>) => setComplexityRatio(e.target.value)}
-              className="w-full p-2 border rounded-lg bg-white"
-            >
-              {complexityScenarios.map(ratio => (
-                <option key={ratio} value={ratio}>{ratio}</option>
-              ))}
-            </select>
-          </div>
+          {showAdvanced && (
+            <div className="space-y-4 p-4 bg-gray-100 rounded-lg">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* M365 Copilot Price */}
+                <div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <label className="block text-sm font-semibold text-gray-700">
+                      M365 Copilot Price ($/user/month)
+                    </label>
+                    <div className="group relative">
+                      <svg className="w-4 h-4 text-blue-500 cursor-help" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                      </svg>
+                      <div className="hidden group-hover:block absolute z-10 w-64 p-2 mt-1 text-xs bg-gray-900 text-white rounded shadow-lg">
+                        <div><strong>Low:</strong> {parameterRanges.m365CopilotPrice.low}</div>
+                        <div><strong>Medium:</strong> {parameterRanges.m365CopilotPrice.medium}</div>
+                        <div><strong>High:</strong> {parameterRanges.m365CopilotPrice.high}</div>
+                      </div>
+                    </div>
+                  </div>
+                  <input
+                    type="range"
+                    min={parameterRanges.m365CopilotPrice.min}
+                    max={parameterRanges.m365CopilotPrice.max}
+                    step={parameterRanges.m365CopilotPrice.step}
+                    value={config.m365CopilotPrice}
+                    onChange={(e: ChangeEvent<HTMLInputElement>) => updateConfig('m365CopilotPrice', parseFloat(e.target.value))}
+                    className="w-full"
+                  />
+                  <div className="flex justify-between text-sm text-gray-600 mt-1">
+                    <span>${parameterRanges.m365CopilotPrice.min}</span>
+                    <span className="font-semibold">${config.m365CopilotPrice}</span>
+                    <span>${parameterRanges.m365CopilotPrice.max}</span>
+                  </div>
+                </div>
+
+                {/* Autonomous Action Ratio */}
+                <div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <label className="block text-sm font-semibold text-gray-700">
+                      Autonomous Action Ratio (%)
+                    </label>
+                    <div className="group relative">
+                      <svg className="w-4 h-4 text-blue-500 cursor-help" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                      </svg>
+                      <div className="hidden group-hover:block absolute z-10 w-64 p-2 mt-1 text-xs bg-gray-900 text-white rounded shadow-lg">
+                        <div><strong>Low:</strong> {parameterRanges.autonomousActionRatio.low}</div>
+                        <div><strong>Medium:</strong> {parameterRanges.autonomousActionRatio.medium}</div>
+                        <div><strong>High:</strong> {parameterRanges.autonomousActionRatio.high}</div>
+                      </div>
+                    </div>
+                  </div>
+                  <input
+                    type="range"
+                    min={parameterRanges.autonomousActionRatio.min}
+                    max={parameterRanges.autonomousActionRatio.max}
+                    step={parameterRanges.autonomousActionRatio.step}
+                    value={config.autonomousActionRatio * 100}
+                    onChange={(e: ChangeEvent<HTMLInputElement>) => updateConfig('autonomousActionRatio', parseFloat(e.target.value) / 100)}
+                    className="w-full"
+                  />
+                  <div className="flex justify-between text-sm text-gray-600 mt-1">
+                    <span>{parameterRanges.autonomousActionRatio.min}%</span>
+                    <span className="font-semibold">{(config.autonomousActionRatio * 100).toFixed(0)}%</span>
+                    <span>{parameterRanges.autonomousActionRatio.max}%</span>
+                  </div>
+                </div>
+
+                {/* Hybrid M365 Users */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Hybrid M365 Users (for hybrid models)
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    max={30000}
+                    value={config.hybridM365Users}
+                    onChange={(e: ChangeEvent<HTMLInputElement>) => updateConfig('hybridM365Users', parseInt(e.target.value) || 0)}
+                    className="w-full p-2 border rounded bg-white"
+                  />
+                </div>
+
+                {/* Peak Multiplier */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Peak Multiplier (every 6 months)
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={2}
+                    step={0.1}
+                    value={config.peakMultiplier}
+                    onChange={(e: ChangeEvent<HTMLInputElement>) => updateConfig('peakMultiplier', parseFloat(e.target.value) || 1)}
+                    className="w-full p-2 border rounded bg-white"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
         </div>
-
-        {/* Advanced Settings Toggle */}
-        <button
-          onClick={() => setShowAdvanced(!showAdvanced)}
-          className="text-blue-600 hover:text-blue-800 font-medium mb-4"
-        >
-          {showAdvanced ? '▼' : '▶'} Advanced Settings
-        </button>
-
-        {showAdvanced && (
-          <div className="space-y-4 mb-6 p-4 bg-gray-100 rounded-lg">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">
-                  Simple Agent Credits/User/Month
-                </label>
-                <input
-                  type="number"
-                  min={VALIDATION.credits.min}
-                  max={VALIDATION.credits.max}
-                  value={simpleCreditsPerUser}
-                  onChange={(e: ChangeEvent<HTMLInputElement>) => {
-                    const val = parseInt(e.target.value) || 0;
-                    setSimpleCreditsPerUser(validateNumber(val, VALIDATION.credits.min, VALIDATION.credits.max));
-                  }}
-                  className="w-full p-2 border rounded bg-white text-sm"
-                  placeholder="0-10000"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">
-                  Complex Agent Credits/User/Month
-                </label>
-                <input
-                  type="number"
-                  min={VALIDATION.credits.min}
-                  max={VALIDATION.credits.max}
-                  value={complexCreditsPerUser}
-                  onChange={(e: ChangeEvent<HTMLInputElement>) => {
-                    const val = parseInt(e.target.value) || 0;
-                    setComplexCreditsPerUser(validateNumber(val, VALIDATION.credits.min, VALIDATION.credits.max));
-                  }}
-                  className="w-full p-2 border rounded bg-white text-sm"
-                  placeholder="0-10000"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">
-                  Year 1 Monthly Growth (%)
-                </label>
-                <input
-                  type="number"
-                  min={VALIDATION.percentage.min}
-                  max={VALIDATION.percentage.max}
-                  value={year1GrowthRate}
-                  onChange={(e: ChangeEvent<HTMLInputElement>) => {
-                    const val = parseInt(e.target.value) || 0;
-                    setYear1GrowthRate(validateNumber(val, VALIDATION.percentage.min, VALIDATION.percentage.max));
-                  }}
-                  className="w-full p-2 border rounded bg-white text-sm"
-                  placeholder="0-100"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">
-                  Adoption Ceiling (%)
-                </label>
-                <input
-                  type="number"
-                  min={VALIDATION.percentage.min}
-                  max={VALIDATION.percentage.max}
-                  value={adoptionCeiling}
-                  onChange={(e: ChangeEvent<HTMLInputElement>) => {
-                    const val = parseInt(e.target.value) || 0;
-                    setAdoptionCeiling(validateNumber(val, VALIDATION.percentage.min, VALIDATION.percentage.max));
-                  }}
-                  className="w-full p-2 border rounded bg-white text-sm"
-                  placeholder="0-100"
-                />
-              </div>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">
-                  Steady State Adoption (%)
-                </label>
-                <input
-                  type="number"
-                  min={VALIDATION.percentage.min}
-                  max={VALIDATION.percentage.max}
-                  value={steadyStateAdoption}
-                  onChange={(e: ChangeEvent<HTMLInputElement>) => {
-                    const val = parseInt(e.target.value) || 0;
-                    setSteadyStateAdoption(validateNumber(val, VALIDATION.percentage.min, VALIDATION.percentage.max));
-                  }}
-                  className="w-full p-2 border rounded bg-white text-sm"
-                  placeholder="0-100"
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  Used for scenario comparison matrix
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
 
-      {/* Key Metrics Summary */}
-      {currentScenario && (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-          <div className="bg-white rounded-lg shadow p-4">
-            <div className="text-sm text-gray-600 mb-1">Monthly PAYG Cost</div>
-            <div className="text-2xl font-bold text-blue-900">
-              {formatCurrency(currentScenario.monthlyPayg)}
-            </div>
-            <div className="text-xs text-gray-500 mt-1">
-              {formatNumber(currentScenario.creditsPerUserMonth)} credits/user
-            </div>
-          </div>
-
-          <div className="bg-white rounded-lg shadow p-4">
-            <div className="text-sm text-gray-600 mb-1">Annual PAYG Cost</div>
-            <div className="text-2xl font-bold text-blue-900">
-              {formatCurrency(currentScenario.yearlyPayg)}
-            </div>
-            <div className="text-xs text-gray-500 mt-1">
-              Year 1 projection
-            </div>
-          </div>
-
-          <div className="bg-white rounded-lg shadow p-4">
-            <div className="text-sm text-gray-600 mb-1">M365 Copilot Cost</div>
-            <div className="text-2xl font-bold text-gray-600">
-              {formatCurrency(currentScenario.yearlyM365)}
-            </div>
-            <div className="text-xs text-gray-500 mt-1">
-              Annual comparison
-            </div>
-          </div>
-
-          <div className="bg-white rounded-lg shadow p-4">
-            <div className="text-sm text-gray-600 mb-1">Annual Savings</div>
-            <div className="text-2xl font-bold text-green-600">
-              {formatCurrency(currentScenario.savings)}
-            </div>
-            <div className="text-xs text-green-600 mt-1">
-              {currentScenario.savingsPercent}% less than M365
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 24-Month Projection Chart */}
+      {/* 3-Year Cost Summary Table */}
       <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
         <h2 className="text-xl font-bold text-gray-900 mb-4">
-          24-Month Cost Projection
+          3-Year Cost Summary
+        </h2>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-100">
+              <tr>
+                <th className="p-3 text-left">Pricing Model</th>
+                <th className="p-3 text-right">Year 1</th>
+                <th className="p-3 text-right">Year 2</th>
+                <th className="p-3 text-right">Year 3</th>
+                <th className="p-3 text-right font-bold">3-Year Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {pricingSummary.map((summary, idx) => {
+                const isCheapest = summary.model === cheapestModel.model;
+                return (
+                  <tr
+                    key={idx}
+                    className={`border-t ${isCheapest ? 'bg-green-50 font-semibold' : ''}`}
+                  >
+                    <td className="p-3 flex items-center gap-2">
+                      <div className="w-4 h-4 rounded" style={{ backgroundColor: summary.color }}></div>
+                      {summary.model}
+                    </td>
+                    <td className="p-3 text-right">{formatCurrency(summary.year1)}</td>
+                    <td className="p-3 text-right">{formatCurrency(summary.year2)}</td>
+                    <td className="p-3 text-right">{formatCurrency(summary.year3)}</td>
+                    <td className="p-3 text-right font-bold">{formatCurrency(summary.total)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Pricing Legend Boxes */}
+        <div className="mt-6 grid grid-cols-1 md:grid-cols-5 gap-3">
+          {pricingSummary.map((summary, idx) => (
+            <div
+              key={idx}
+              className="p-3 rounded-lg border-2"
+              style={{ borderColor: summary.color, backgroundColor: `${summary.color}15` }}
+            >
+              <div className="text-xs font-medium text-gray-700 mb-1">{summary.model}</div>
+              <div className="text-lg font-bold" style={{ color: summary.color }}>
+                {formatCurrency(summary.total)}
+              </div>
+              <div className="text-xs text-gray-600 mt-1">
+                {summary.model === cheapestModel.model ? '✓ Cheapest' : `+${formatCurrency(summary.total - cheapestModel.total)}`}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Monthly Cost Comparison Chart */}
+      <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
+        <h2 className="text-xl font-bold text-gray-900 mb-4">
+          36-Month Cost Comparison (All Pricing Models)
         </h2>
         <ResponsiveContainer width="100%" height={480}>
           <LineChart
@@ -310,171 +636,196 @@ const CopilotCostCalculator: React.FC = () => {
               type="monotone"
               dataKey="paygCost"
               stroke="#3b82f6"
-              strokeWidth={3}
-              name="Pay-as-you-go"
-              dot={{ r: 3 }}
+              strokeWidth={2}
+              name="PAYG Alone"
+              dot={false}
             />
             <Line
               type="monotone"
-              dataKey="m365Cost"
-              stroke="#7c3aed"
+              dataKey="p3Cost"
+              stroke="#8b5cf6"
+              strokeWidth={2}
+              name="P3 Pre-Purchase"
+              dot={false}
+            />
+            <Line
+              type="monotone"
+              dataKey="paygM365Cost"
+              stroke="#10b981"
+              strokeWidth={2}
+              name="PAYG + M365 Licenses"
+              dot={false}
+            />
+            <Line
+              type="monotone"
+              dataKey="p3M365Cost"
+              stroke="#f59e0b"
+              strokeWidth={2}
+              name="P3 + M365 Licenses"
+              dot={false}
+            />
+            <Line
+              type="monotone"
+              dataKey="m365AllCost"
+              stroke="#ef4444"
               strokeWidth={2}
               strokeDasharray="5 5"
-              name="M365 Copilot (reference)"
+              name="M365 Copilot for All"
               dot={false}
             />
           </LineChart>
         </ResponsiveContainer>
-
-        <div className="mt-4 grid grid-cols-2 gap-4">
-          <div className="bg-blue-50 p-3 rounded">
-            <div className="text-sm font-medium text-blue-900">Year 1 Total (Growing)</div>
-            <div className="text-xl font-bold text-blue-900">
-              {formatCurrency(monthlyData.slice(0, 12).reduce((sum, m) => sum + m.paygCost, 0))}
-            </div>
-          </div>
-          <div className="bg-green-50 p-3 rounded">
-            <div className="text-sm font-medium text-green-900">Year 2 Total (Stable)</div>
-            <div className="text-xl font-bold text-green-900">
-              {formatCurrency(monthlyData.slice(12, 24).reduce((sum, m) => sum + m.paygCost, 0))}
-            </div>
-          </div>
-        </div>
       </div>
 
-      {/* Adoption Curve */}
+      {/* User Growth Bar Chart */}
       <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
         <h2 className="text-xl font-bold text-gray-900 mb-4">
-          User Adoption Curve
+          User Growth Timeline (7 Deployment Stages)
         </h2>
         <ResponsiveContainer width="100%" height={380}>
-          <LineChart
-            data={monthlyData}
+          <BarChart
+            data={stages}
             margin={{ top: 20, right: 30, left: 60, bottom: 60 }}
           >
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis
-              dataKey="month"
-              label={{ value: 'Month', position: 'insideBottom', offset: -10 }}
+              dataKey="name"
+              angle={-45}
+              textAnchor="end"
+              height={100}
             />
             <YAxis
-              label={{ value: 'Active Users', angle: -90, position: 'insideLeft', offset: 20 }}
+              label={{ value: 'Users', angle: -90, position: 'insideLeft', offset: 20 }}
             />
             <Tooltip
-              labelFormatter={(month: number) => `Month ${month}`}
+              formatter={(value: number, name: string) => {
+                if (name === 'Users') return formatNumber(value);
+                return value;
+              }}
+              labelFormatter={(label: string) => {
+                const stage = stages.find(s => s.name === label);
+                return stage ? `${stage.name} - Month ${stage.month}` : label;
+              }}
             />
             <Legend
               verticalAlign="top"
               height={36}
               wrapperStyle={{ paddingBottom: '10px' }}
             />
-            <Line
-              type="monotone"
-              dataKey="activeUsers"
-              stroke="#10b981"
-              strokeWidth={3}
-              name="Active Users"
-            />
-          </LineChart>
+            <Bar dataKey="users" name="Users" radius={[8, 8, 0, 0]}>
+              {stages.map((stage, index) => (
+                <Cell key={`cell-${index}`} fill={
+                  stage.phase === 'Pilot' ? '#3b82f6' :
+                  stage.phase === 'Expansion' ? '#10b981' :
+                  stage.phase === 'Management' ? '#f59e0b' :
+                  stage.phase === 'Stores' ? '#8b5cf6' :
+                  '#ef4444'
+                } />
+              ))}
+            </Bar>
+          </BarChart>
         </ResponsiveContainer>
       </div>
 
-      {/* Scenario Comparison Matrix */}
+      {/* Strategic Recommendations */}
       <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
         <h2 className="text-xl font-bold text-gray-900 mb-4">
-          Full Scenario Comparison Matrix
-        </h2>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-100">
-              <tr>
-                <th className="p-2 text-left">Users</th>
-                <th className="p-2 text-left">Agents</th>
-                <th className="p-2 text-left">Ratio</th>
-                <th className="p-2 text-right">Credits/User/Mo</th>
-                <th className="p-2 text-right">Monthly PAYG</th>
-                <th className="p-2 text-right">Annual PAYG</th>
-                <th className="p-2 text-right">Annual M365</th>
-                <th className="p-2 text-right">Savings</th>
-                <th className="p-2 text-right">% Saved</th>
-              </tr>
-            </thead>
-            <tbody>
-              {scenarioData.map((scenario, idx) => (
-                <tr
-                  key={idx}
-                  className={`border-t ${
-                    scenario.users === userCount &&
-                    scenario.agents === agentCount &&
-                    scenario.ratio === complexityRatio
-                      ? 'bg-blue-50 font-semibold'
-                      : ''
-                  }`}
-                >
-                  <td className="p-2">{formatNumber(scenario.users)}</td>
-                  <td className="p-2">{scenario.agents}</td>
-                  <td className="p-2">{scenario.ratio}</td>
-                  <td className="p-2 text-right">{formatNumber(scenario.creditsPerUserMonth)}</td>
-                  <td className="p-2 text-right">{formatCurrency(scenario.monthlyPayg)}</td>
-                  <td className="p-2 text-right font-medium">{formatCurrency(scenario.yearlyPayg)}</td>
-                  <td className="p-2 text-right text-gray-600">{formatCurrency(scenario.yearlyM365)}</td>
-                  <td className="p-2 text-right text-green-600 font-medium">
-                    {formatCurrency(scenario.savings)}
-                  </td>
-                  <td className="p-2 text-right text-green-600">
-                    {scenario.savingsPercent}%
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* Key Insights */}
-      <div className="bg-white rounded-lg shadow-lg p-6">
-        <h2 className="text-xl font-bold text-gray-900 mb-4">
-          Key Insights & Recommendations
+          Strategic Recommendations
         </h2>
 
         <div className="space-y-4">
           <div className="border-l-4 border-green-500 pl-4">
-            <h3 className="font-semibold text-gray-900 mb-2">Cost Advantage</h3>
+            <h3 className="font-semibold text-gray-900 mb-2">Winner by Stage</h3>
             <p className="text-gray-700">
-              Pay-as-you-go is {currentScenario?.savingsPercent}% cheaper than M365 Copilot for your scenario,
-              saving {formatCurrency(currentScenario?.savings ?? 0)} annually. This model is optimal when
-              credit consumption stays below 3,000 credits/user/month.
+              <strong>Best Overall:</strong> {cheapestModel.model} with 3-year total of {formatCurrency(cheapestModel.total)}.
+              {cheapestModel.model.includes('PAYG') && ' PAYG models offer cost advantages at lower usage levels.'}
+              {cheapestModel.model.includes('M365') && ' Hybrid models balance license costs with usage-based pricing.'}
             </p>
           </div>
 
           <div className="border-l-4 border-blue-500 pl-4">
             <h3 className="font-semibold text-gray-900 mb-2">Breakeven Analysis</h3>
             <p className="text-gray-700">
-              M365 Copilot becomes cost-effective at {formatNumber(BREAKEVEN_CREDITS)} credits/user/month.
-              Your current projection: {currentScenario?.creditsPerUserMonth ?? 0} credits/user/month.
-              {(currentScenario?.creditsPerUserMonth ?? 0) < BREAKEVEN_CREDITS
-                ? ' ✓ Pay-as-you-go is optimal.'
-                : ' ⚠ Consider M365 Copilot licenses.'}
+              At {creditsPerConversation.toFixed(1)} credits/conversation, monitor monthly consumption closely.
+              M365 Copilot ($30/user/month) becomes cost-effective at 3,000 credits/user/month.
+              Hybrid models optimize costs by giving M365 licenses to power users while using PAYG for occasional users.
             </p>
           </div>
 
           <div className="border-l-4 border-yellow-500 pl-4">
-            <h3 className="font-semibold text-gray-900 mb-2">Cost Optimization Tips</h3>
+            <h3 className="font-semibold text-gray-900 mb-2">Recommended Phased Strategy</h3>
             <ul className="list-disc list-inside text-gray-700 space-y-1">
-              <li>Favor classic answers (1 credit) over generative (2 credits) where possible</li>
-              <li>Minimize tenant graph grounding calls (10 credits each) - cache results</li>
-              <li>Monitor usage patterns before committing to prepaid packs ($200/25k credits)</li>
-              <li>Separate dev/test/prod environments to avoid inflating costs</li>
-              <li>Implement governance on which teams can publish agents</li>
+              <li><strong>Pilot (Month 1-3):</strong> Start with PAYG to measure actual usage patterns</li>
+              <li><strong>Expansion (Month 4-9):</strong> Continue PAYG, consider P3 if usage is consistent</li>
+              <li><strong>Management (Month 10-18):</strong> Evaluate hybrid models for power users</li>
+              <li><strong>Enterprise (Month 19+):</strong> Optimize mix based on usage data - consider M365 for high-consumption users</li>
             </ul>
           </div>
 
           <div className="border-l-4 border-purple-500 pl-4">
-            <h3 className="font-semibold text-gray-900 mb-2">Growth Considerations</h3>
+            <h3 className="font-semibold text-gray-900 mb-2">3-Year Total Comparison</h3>
             <p className="text-gray-700">
-              As adoption increases and agents become more complex, monitor the credit burn rate.
-              Complex agents with autonomous triggers and tenant grounding can consume 1,000-1,500 credits/user/month,
-              at which point M365 Copilot licensing may become more economical.
+              Savings from {cheapestModel.model} vs most expensive: {formatCurrency(
+                pricingSummary.reduce((max, curr) => curr.total > max.total ? curr : max).total - cheapestModel.total
+              )}. The choice depends on your organization's M365 licensing strategy and predicted usage growth.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Cost Optimization Tips */}
+      <div className="bg-white rounded-lg shadow-lg p-6">
+        <h2 className="text-xl font-bold text-gray-900 mb-4">
+          Cost Optimization Tips
+        </h2>
+
+        <div className="space-y-3">
+          <div className="bg-blue-50 p-3 rounded-lg">
+            <h4 className="font-semibold text-blue-900 mb-1">Classic vs Generative Turns</h4>
+            <p className="text-sm text-blue-800">
+              Classic responses (1 credit) cost 50% less than generative (2 credits). Design agents to use classic responses for FAQ-style queries and reserve generative AI for complex problem-solving.
+            </p>
+          </div>
+
+          <div className="bg-green-50 p-3 rounded-lg">
+            <h4 className="font-semibold text-green-900 mb-1">Action Usage Best Practices</h4>
+            <p className="text-sm text-green-800">
+              Actions cost 5 credits each. Batch multiple data operations into single actions where possible. Cache frequently-accessed data to reduce redundant action calls.
+            </p>
+          </div>
+
+          <div className="bg-yellow-50 p-3 rounded-lg">
+            <h4 className="font-semibold text-yellow-900 mb-1">Peak Month Planning</h4>
+            <p className="text-sm text-yellow-800">
+              Plan for {((config.peakMultiplier - 1) * 100).toFixed(0)}% usage spikes every 6 months. Consider P3 pre-purchase (15% discount) if your baseline usage is predictable.
+            </p>
+          </div>
+
+          <div className="bg-purple-50 p-3 rounded-lg">
+            <h4 className="font-semibold text-purple-900 mb-1">When to Switch: PAYG → P3</h4>
+            <p className="text-sm text-purple-800">
+              P3 pre-purchase offers 15% savings. Switch when monthly usage is consistent (±20%) for 3+ months. The discount offsets the commitment risk.
+            </p>
+          </div>
+
+          <div className="bg-pink-50 p-3 rounded-lg">
+            <h4 className="font-semibold text-pink-900 mb-1">When to Add M365 Licenses (Hybrid)</h4>
+            <p className="text-sm text-pink-800">
+              Give M365 Copilot licenses to users consuming &gt;3,000 credits/month. For hybrid models, only autonomous actions ({(config.autonomousActionRatio * 100).toFixed(0)}% of actions) incur credits for licensed users.
+            </p>
+          </div>
+
+          <div className="bg-indigo-50 p-3 rounded-lg">
+            <h4 className="font-semibold text-indigo-900 mb-1">Autonomous Action Optimization</h4>
+            <p className="text-sm text-indigo-800">
+              With M365 licenses, user-triggered actions are free - only autonomous (scheduled/background) actions incur credits. Design workflows to maximize user-triggered interactions.
+            </p>
+          </div>
+
+          <div className="bg-gray-50 p-3 rounded-lg">
+            <h4 className="font-semibold text-gray-900 mb-1">Dev/Test/Prod Separation</h4>
+            <p className="text-sm text-gray-800">
+              Separate development and testing environments from production billing. Use mock responses in dev/test to avoid consuming production credits during agent development.
             </p>
           </div>
         </div>
