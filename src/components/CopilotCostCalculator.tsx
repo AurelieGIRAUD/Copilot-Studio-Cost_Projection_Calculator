@@ -11,7 +11,7 @@ import {
 } from '../utils/calculations';
 
 const CopilotCostCalculator: React.FC = () => {
-  const [userCount, setUserCount] = useState<number>(1300);
+  const [userCount, setUserCount] = useState<number>(130);
   // Note: agentCount is used for scenario categorization in the comparison table
   // Future enhancement: could factor agent count into credit consumption calculations
   const [agentCount, setAgentCount] = useState<number>(10);
@@ -31,7 +31,7 @@ const CopilotCostCalculator: React.FC = () => {
     percentage: { min: 0, max: 100 }
   };
 
-  const userScenarios: number[] = [1300, 5000, 30000];
+  const userScenarios: number[] = [130, 500, 1000, 2500, 6000, 12000, 30000];
   const agentScenarios: number[] = [10, 30, 100];
   const complexityScenarios: string[] = ['80/20', '70/30', '50/50'];
 
