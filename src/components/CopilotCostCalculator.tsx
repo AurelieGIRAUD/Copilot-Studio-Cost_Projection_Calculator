@@ -1,5 +1,5 @@
 import React, { useState, useMemo, ChangeEvent } from 'react';
-import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 // Interfaces
 interface Stage {
@@ -26,6 +26,7 @@ interface MonthlyData {
   year: string;
   users: number;
   dau: number;
+  dauPercent: number;
   activeUsers: number;
   conversations: number;
   credits: number;
@@ -199,6 +200,7 @@ const CopilotCostCalculator: React.FC = () => {
         year: month <= 12 ? 'Year 1' : month <= 24 ? 'Year 2' : 'Year 3',
         users,
         dau,
+        dauPercent: dau * 100, // DAU as percentage for chart display
         activeUsers,
         conversations: Math.round(conversations),
         credits: Math.round(totalCredits),
@@ -677,54 +679,125 @@ const CopilotCostCalculator: React.FC = () => {
         </ResponsiveContainer>
       </div>
 
-      {/* User Growth Bar Chart */}
+      {/* Onboarding Strategy & User Growth */}
       <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
         <h2 className="text-xl font-bold text-gray-900 mb-4">
-          User Growth Timeline (7 Deployment Stages)
+          Onboarding Strategy & User Growth (36 Months)
         </h2>
         <ResponsiveContainer width="100%" height={380}>
-          <BarChart
-            data={stages}
-            margin={{ top: 20, right: 30, left: 60, bottom: 60 }}
+          <LineChart
+            data={monthlyData}
+            margin={{ top: 20, right: 60, left: 60, bottom: 60 }}
           >
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis
-              dataKey="name"
-              angle={-45}
-              textAnchor="end"
-              height={100}
+              dataKey="month"
+              label={{ value: 'Month', position: 'insideBottom', offset: -10 }}
             />
             <YAxis
-              label={{ value: 'Users', angle: -90, position: 'insideLeft', offset: 20 }}
+              yAxisId="left"
+              label={{ value: 'Number of Users', angle: -90, position: 'insideLeft', offset: 20 }}
+            />
+            <YAxis
+              yAxisId="right"
+              orientation="right"
+              label={{ value: 'Daily Active Users (%)', angle: 90, position: 'insideRight', offset: 20 }}
             />
             <Tooltip
               formatter={(value: number, name: string) => {
-                if (name === 'Users') return formatNumber(value);
-                return value;
+                if (name === "DAU %") return `${value}%`;
+                return formatNumber(value);
               }}
-              labelFormatter={(label: string) => {
-                const stage = stages.find(s => s.name === label);
-                return stage ? `${stage.name} - Month ${stage.month}` : label;
-              }}
+              labelFormatter={(month: number) => `Month ${month}`}
             />
             <Legend
               verticalAlign="top"
               height={36}
               wrapperStyle={{ paddingBottom: '10px' }}
             />
-            <Bar dataKey="users" name="Users" radius={[8, 8, 0, 0]}>
-              {stages.map((stage, index) => (
-                <Cell key={`cell-${index}`} fill={
-                  stage.phase === 'Pilot' ? '#3b82f6' :
-                  stage.phase === 'Expansion' ? '#10b981' :
-                  stage.phase === 'Management' ? '#f59e0b' :
-                  stage.phase === 'Stores' ? '#8b5cf6' :
-                  '#ef4444'
-                } />
-              ))}
-            </Bar>
-          </BarChart>
+            <Line
+              yAxisId="left"
+              type="monotone"
+              dataKey="users"
+              stroke="#8b5cf6"
+              strokeWidth={3}
+              name="Total Users (Cumulative)"
+              dot={{ r: 1 }}
+            />
+            <Line
+              yAxisId="left"
+              type="monotone"
+              dataKey="activeUsers"
+              stroke="#06b6d4"
+              strokeWidth={2}
+              strokeDasharray="5 5"
+              name="Daily Active Users"
+              dot={false}
+            />
+            <Line
+              yAxisId="right"
+              type="monotone"
+              dataKey="dauPercent"
+              stroke="#f59e0b"
+              strokeWidth={2}
+              strokeDasharray="3 3"
+              name="DAU %"
+              dot={false}
+            />
+          </LineChart>
         </ResponsiveContainer>
+
+        {/* Onboarding Roadmap with Milestones */}
+        <div className="mt-6 space-y-3">
+          <h3 className="font-semibold text-gray-800 mb-3">Rollout Milestones & Strategy</h3>
+          {stages.map((stage, idx) => (
+            <div key={idx} className="relative pl-8 pb-4">
+              {/* Timeline connector */}
+              {idx < stages.length - 1 && (
+                <div className="absolute left-2 top-6 bottom-0 w-0.5 bg-gray-300"></div>
+              )}
+
+              {/* Milestone marker */}
+              <div className="absolute left-0 top-1 w-4 h-4 rounded-full bg-blue-500 border-2 border-white"></div>
+
+              <div className="bg-gray-50 rounded-lg p-3 hover:bg-gray-100 transition-colors">
+                <div className="flex items-center justify-between mb-1">
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs font-semibold text-blue-600 bg-blue-100 px-2 py-1 rounded">
+                      Month {stage.month}
+                    </span>
+                    <span className="font-semibold text-gray-900">{stage.name}</span>
+                  </div>
+                  <span className={`text-xs px-2 py-1 rounded font-medium ${
+                    stage.phase === 'Pilot' ? 'bg-purple-100 text-purple-700' :
+                    stage.phase === 'Expansion' ? 'bg-blue-100 text-blue-700' :
+                    stage.phase === 'Management' ? 'bg-green-100 text-green-700' :
+                    stage.phase === 'Stores' ? 'bg-amber-100 text-amber-700' :
+                    'bg-gray-100 text-gray-700'
+                  }`}>
+                    {stage.phase}
+                  </span>
+                </div>
+                <div className="flex gap-4 text-xs text-gray-600 mt-2">
+                  <span>👥 <strong>{formatNumber(stage.users)}</strong> total users</span>
+                  <span>📊 <strong>{(stage.dau * 100).toFixed(0)}%</strong> DAU rate</span>
+                  <span>✅ <strong>~{formatNumber(Math.round(stage.users * stage.dau))}</strong> daily active</span>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Key Strategy Notes */}
+        <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
+          <h4 className="font-semibold text-blue-900 mb-2">🎯 Onboarding Strategy Key Points:</h4>
+          <ul className="text-sm text-blue-800 space-y-1">
+            <li>• <strong>Gradual rollout</strong> over 31 months minimizes disruption and allows for learning</li>
+            <li>• <strong>DAU decreases</strong> from 45% → 28% as casual users join (expected and healthy)</li>
+            <li>• <strong>HQ first</strong> (engaged users) builds success stories before broader rollout</li>
+            <li>• <strong>Store workers last</strong> (lowest DAU) ensures infrastructure is proven at scale</li>
+          </ul>
+        </div>
       </div>
 
       {/* Strategic Recommendations */}
