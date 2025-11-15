@@ -1,5 +1,6 @@
 import React, { useState, useMemo, ChangeEvent } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { Plus, Trash2, Edit2 } from 'lucide-react';
 
 // Interfaces
 interface Stage {
@@ -46,6 +47,20 @@ interface PricingSummary {
   color: string;
 }
 
+interface Agent {
+  id: number;
+  name: string;
+  purpose: string;
+  conversationsPerDay: number;
+  turns: number;
+  generativeRatio: number;
+  actions: number;
+  tenantGraph: boolean;
+  deployMonth: number;
+  segments: string[];
+  color: string;
+}
+
 const CopilotCostCalculator: React.FC = () => {
   // Stages with time-based rollout (now editable)
   const [stages, setStages] = useState<Stage[]>([
@@ -74,6 +89,55 @@ const CopilotCostCalculator: React.FC = () => {
   const [showAdvanced, setShowAdvanced] = useState<boolean>(false);
   const [showStageEditor, setShowStageEditor] = useState<boolean>(false);
   const [showRolloutPlan, setShowRolloutPlan] = useState<boolean>(false);
+  const [showAgentPortfolio, setShowAgentPortfolio] = useState<boolean>(false);
+
+  // Agent portfolio state
+  const agentColors = ['#8b5cf6', '#3b82f6', '#f59e0b', '#22c55e', '#ef4444', '#ec4899', '#06b6d4', '#84cc16'];
+
+  const [agents, setAgents] = useState<Agent[]>([
+    {
+      id: 1,
+      name: 'HR Helper',
+      purpose: 'Benefits, PTO, policies',
+      conversationsPerDay: 1.5,
+      turns: 4,
+      generativeRatio: 0.50,
+      actions: 0.5,
+      tenantGraph: false,
+      deployMonth: 1,
+      segments: ['HQ', 'Management', 'Stores', 'All'],
+      color: '#8b5cf6'
+    },
+    {
+      id: 2,
+      name: 'IT Helpdesk',
+      purpose: 'Password reset, access requests',
+      conversationsPerDay: 1.0,
+      turns: 5,
+      generativeRatio: 0.60,
+      actions: 2,
+      tenantGraph: false,
+      deployMonth: 1,
+      segments: ['HQ', 'Management', 'Stores', 'All'],
+      color: '#3b82f6'
+    },
+    {
+      id: 3,
+      name: 'Document Search',
+      purpose: 'Policy docs, manuals',
+      conversationsPerDay: 1.0,
+      turns: 6,
+      generativeRatio: 0.80,
+      actions: 1,
+      tenantGraph: true,
+      deployMonth: 4,
+      segments: ['HQ', 'Management'],
+      color: '#f59e0b'
+    }
+  ]);
+
+  const [editingAgent, setEditingAgent] = useState<Agent | null>(null);
+  const [showAddAgent, setShowAddAgent] = useState<boolean>(false);
 
   // Update stage values
   const updateStage = (index: number, field: 'users' | 'dau', value: number) => {
@@ -84,6 +148,31 @@ const CopilotCostCalculator: React.FC = () => {
       newStages[index] = { ...newStages[index], [field]: value };
     }
     setStages(newStages);
+  };
+
+  // Agent helper functions
+  const calculateAgentCredits = (agent: Agent): number => {
+    const classicCredits = agent.turns * (1 - agent.generativeRatio) * 1;
+    const generativeCredits = agent.turns * agent.generativeRatio * 2;
+    const actionCredits = agent.actions * 5;
+    const graphCredits = agent.tenantGraph ? 10 : 0;
+    return classicCredits + generativeCredits + actionCredits + graphCredits;
+  };
+
+  const addAgent = (newAgent: Partial<Agent>) => {
+    const id = Math.max(...agents.map(a => a.id), 0) + 1;
+    const color = agentColors[agents.length % agentColors.length];
+    setAgents([...agents, { ...newAgent, id, color } as Agent]);
+    setShowAddAgent(false);
+  };
+
+  const updateAgent = (id: number, updatedAgent: Partial<Agent>) => {
+    setAgents(agents.map(a => a.id === id ? { ...a, ...updatedAgent } : a));
+    setEditingAgent(null);
+  };
+
+  const deleteAgent = (id: number) => {
+    setAgents(agents.filter(a => a.id !== id));
   };
 
   // Parameter ranges with market research guidance
@@ -888,6 +977,215 @@ const CopilotCostCalculator: React.FC = () => {
         </div>
       </div>
 
+      {/* Agent Portfolio Cost Assessment */}
+      <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
+        <button
+          onClick={() => setShowAgentPortfolio(!showAgentPortfolio)}
+          className="text-xl font-bold text-gray-900 mb-4 hover:text-blue-600 transition-colors flex items-center gap-2"
+        >
+          {showAgentPortfolio ? '▼' : '▶'} Agent Portfolio Cost Assessment
+        </button>
+
+        {showAgentPortfolio && (
+          <div className="space-y-6">
+            {/* Agent Portfolio Management */}
+            <div className="bg-gray-50 rounded-lg p-5 border border-gray-200">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-gray-800">Agent Portfolio ({agents.length} agents)</h3>
+                <button
+                  onClick={() => setShowAddAgent(true)}
+                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  <Plus size={18} />
+                  Add Agent
+                </button>
+              </div>
+
+              {/* Agent List */}
+              <div className="space-y-3">
+                {agents.map(agent => (
+                  <div key={agent.id} className="border rounded-lg p-4 bg-white hover:bg-gray-50 transition-colors">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3 mb-2">
+                          <div className="w-3 h-3 rounded-full" style={{ backgroundColor: agent.color }}></div>
+                          <h4 className="font-semibold text-gray-900">{agent.name}</h4>
+                          <span className="text-xs px-2 py-1 bg-gray-100 text-gray-600 rounded">
+                            Month {agent.deployMonth}+
+                          </span>
+                        </div>
+                        <p className="text-sm text-gray-600 mb-3">{agent.purpose}</p>
+
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+                          <div>
+                            <span className="text-gray-500">Conversations/day:</span>
+                            <span className="ml-1 font-medium">{agent.conversationsPerDay}</span>
+                          </div>
+                          <div>
+                            <span className="text-gray-500">Turns:</span>
+                            <span className="ml-1 font-medium">{agent.turns}</span>
+                          </div>
+                          <div>
+                            <span className="text-gray-500">Generative:</span>
+                            <span className="ml-1 font-medium">{(agent.generativeRatio * 100).toFixed(0)}%</span>
+                          </div>
+                          <div>
+                            <span className="text-gray-500">Actions:</span>
+                            <span className="ml-1 font-medium">{agent.actions}</span>
+                          </div>
+                          <div>
+                            <span className="text-gray-500">Tenant Graph:</span>
+                            <span className="ml-1 font-medium">{agent.tenantGraph ? 'Yes' : 'No'}</span>
+                          </div>
+                          <div>
+                            <span className="text-gray-500">Credits/Conv:</span>
+                            <span className="ml-1 font-medium text-blue-600">{calculateAgentCredits(agent).toFixed(1)}</span>
+                          </div>
+                          <div className="col-span-2">
+                            <span className="text-gray-500">Segments:</span>
+                            <span className="ml-1 font-medium">{agent.segments.join(', ')}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex gap-2 ml-4">
+                        <button
+                          onClick={() => setEditingAgent(agent)}
+                          className="p-2 text-gray-600 hover:bg-gray-100 rounded transition-colors"
+                        >
+                          <Edit2 size={16} />
+                        </button>
+                        <button
+                          onClick={() => deleteAgent(agent.id)}
+                          className="p-2 text-red-600 hover:bg-red-50 rounded transition-colors"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Add/Edit Agent Form */}
+              {(showAddAgent || editingAgent) && (
+                <AgentForm
+                  agent={editingAgent}
+                  onSave={editingAgent ? (data: Partial<Agent>) => updateAgent(editingAgent.id, data) : addAgent}
+                  onCancel={() => {
+                    setShowAddAgent(false);
+                    setEditingAgent(null);
+                  }}
+                />
+              )}
+            </div>
+
+            {/* Portfolio Impact Summary */}
+            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-lg p-5">
+              <h3 className="text-lg font-semibold mb-3 text-blue-900">📊 Agent Portfolio Overview</h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="bg-white rounded-lg p-4 shadow-sm">
+                  <div className="text-sm text-gray-600 mb-1">Total Portfolio</div>
+                  <div className="text-2xl font-bold text-blue-900">{agents.length} Agents</div>
+                  <div className="text-xs text-gray-500 mt-1">
+                    Avg: {agents.length > 0 ? (agents.reduce((s, a) => s + calculateAgentCredits(a), 0) / agents.length).toFixed(1) : 0} credits/conv
+                  </div>
+                </div>
+                <div className="bg-white rounded-lg p-4 shadow-sm">
+                  <div className="text-sm text-gray-600 mb-1">Complexity Range</div>
+                  <div className="text-2xl font-bold text-blue-900">
+                    {agents.length > 0 ? Math.min(...agents.map(a => calculateAgentCredits(a))).toFixed(1) : 0} - {agents.length > 0 ? Math.max(...agents.map(a => calculateAgentCredits(a))).toFixed(1) : 0}
+                  </div>
+                  <div className="text-xs text-gray-500 mt-1">Credits per conversation range</div>
+                </div>
+                <div className="bg-white rounded-lg p-4 shadow-sm">
+                  <div className="text-sm text-gray-600 mb-1">Using Tenant Graph</div>
+                  <div className="text-2xl font-bold text-blue-900">
+                    {agents.filter(a => a.tenantGraph).length} / {agents.length}
+                  </div>
+                  <div className="text-xs text-gray-500 mt-1">+10 credits/conversation each</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Agent Cost Breakdown Table */}
+            <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+              <h3 className="text-lg font-semibold p-4 bg-gray-50 border-b">Agent Cost Breakdown</h3>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-100">
+                    <tr>
+                      <th className="p-3 text-left">Agent</th>
+                      <th className="p-3 text-right">Credits/Conv</th>
+                      <th className="p-3 text-right">Deploy Month</th>
+                      <th className="p-3 text-right">Segments</th>
+                      <th className="p-3 text-right">Complexity</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {agents.map(agent => {
+                      const credits = calculateAgentCredits(agent);
+                      return (
+                        <tr key={agent.id} className="border-b hover:bg-gray-50">
+                          <td className="p-3">
+                            <div className="flex items-center gap-2">
+                              <div className="w-3 h-3 rounded-full" style={{ backgroundColor: agent.color }}></div>
+                              <span className="font-medium">{agent.name}</span>
+                            </div>
+                          </td>
+                          <td className="p-3 text-right font-mono">{credits.toFixed(1)}</td>
+                          <td className="p-3 text-right">Month {agent.deployMonth}</td>
+                          <td className="p-3 text-right text-xs">{agent.segments.join(', ')}</td>
+                          <td className="p-3 text-right">
+                            <span className={`px-2 py-1 rounded text-xs ${
+                              credits > 20 ? 'bg-red-100 text-red-700' :
+                              credits > 10 ? 'bg-yellow-100 text-yellow-700' :
+                              'bg-green-100 text-green-700'
+                            }`}>
+                              {credits > 20 ? 'High' : credits > 10 ? 'Medium' : 'Low'}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Key Insights */}
+            <div className="p-5 bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-300 rounded-lg">
+              <h3 className="font-semibold text-green-900 mb-3 text-lg">💡 Portfolio Recommendations</h3>
+              <div className="space-y-3 text-sm text-green-900">
+                <div className="bg-white p-4 rounded shadow-sm">
+                  <p className="font-semibold mb-2">📊 Your Agent Portfolio:</p>
+                  <ul className="list-disc list-inside space-y-1 ml-2">
+                    <li><strong>{agents.length} agents</strong> deployed across rollout phases</li>
+                    {agents.length > 0 && (
+                      <>
+                        <li><strong>Most complex:</strong> {agents.sort((a, b) => calculateAgentCredits(b) - calculateAgentCredits(a))[0]?.name} ({calculateAgentCredits(agents.sort((a, b) => calculateAgentCredits(b) - calculateAgentCredits(a))[0]).toFixed(1)} credits/conv)</li>
+                        <li><strong>Most efficient:</strong> {agents.sort((a, b) => calculateAgentCredits(a) - calculateAgentCredits(b))[0]?.name} ({calculateAgentCredits(agents.sort((a, b) => calculateAgentCredits(a) - calculateAgentCredits(b))[0]).toFixed(1)} credits/conv)</li>
+                      </>
+                    )}
+                    <li><strong>Avg complexity:</strong> {agents.length > 0 ? (agents.reduce((s, a) => s + calculateAgentCredits(a), 0) / agents.length).toFixed(1) : 0} credits/conversation</li>
+                  </ul>
+                </div>
+
+                <div className="bg-white p-4 rounded shadow-sm">
+                  <p className="font-semibold mb-2">💰 Optimization Tips:</p>
+                  <ul className="list-disc list-inside space-y-1 ml-2">
+                    <li><strong>Pilot Phase:</strong> Deploy simpler agents first to prove value and gather usage data</li>
+                    <li><strong>Growth Phase:</strong> Add complex agents once ROI is demonstrated</li>
+                    <li><strong>Tenant Graph:</strong> Turn off tenant graph grounding where not needed (-10 credits/conv savings)</li>
+                    <li><strong>Generative Ratio:</strong> Use classic responses for FAQ-style queries (50% cost savings)</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* Cost Optimization Tips */}
       <div className="bg-white rounded-lg shadow-lg p-6">
         <h2 className="text-xl font-bold text-gray-900 mb-4">
@@ -917,6 +1215,207 @@ const CopilotCostCalculator: React.FC = () => {
             <strong>Dev/Test/Prod Separation:</strong> Separate development and testing environments from production billing. Use mock responses in dev/test to avoid consuming production credits during agent development.
           </li>
         </ul>
+      </div>
+    </div>
+  );
+};
+
+// Agent Form Component
+interface AgentFormProps {
+  agent: Agent | null;
+  onSave: (data: Partial<Agent>) => void;
+  onCancel: () => void;
+}
+
+const AgentForm: React.FC<AgentFormProps> = ({ agent, onSave, onCancel }) => {
+  const [formData, setFormData] = useState<Partial<Agent>>(agent || {
+    name: '',
+    purpose: '',
+    conversationsPerDay: 1.0,
+    turns: 4,
+    generativeRatio: 0.50,
+    actions: 1,
+    tenantGraph: false,
+    deployMonth: 1,
+    segments: ['HQ']
+  });
+
+  const segments = ['HQ', 'Management', 'Stores', 'All'];
+
+  const calculateCredits = () => {
+    const turns = formData.turns || 0;
+    const generativeRatio = formData.generativeRatio || 0;
+    const actions = formData.actions || 0;
+    const tenantGraph = formData.tenantGraph || false;
+
+    const classic = turns * (1 - generativeRatio);
+    const gen = turns * generativeRatio * 2;
+    const act = actions * 5;
+    const graph = tenantGraph ? 10 : 0;
+    return (classic + gen + act + graph).toFixed(1);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6">
+        <h3 className="text-xl font-bold mb-4">{agent ? 'Edit Agent' : 'Add New Agent'}</h3>
+
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium mb-1">Agent Name *</label>
+            <input
+              type="text"
+              value={formData.name || ''}
+              onChange={(e: ChangeEvent<HTMLInputElement>) => setFormData({...formData, name: e.target.value})}
+              className="w-full px-3 py-2 border rounded"
+              placeholder="e.g., Store Procedures"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1">Purpose/Description *</label>
+            <input
+              type="text"
+              value={formData.purpose || ''}
+              onChange={(e: ChangeEvent<HTMLInputElement>) => setFormData({...formData, purpose: e.target.value})}
+              className="w-full px-3 py-2 border rounded"
+              placeholder="e.g., SOPs, training materials"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium mb-1">Conversations/Day per User</label>
+              <input
+                type="number"
+                min="0.1"
+                max="10"
+                step="0.5"
+                value={formData.conversationsPerDay || 1.0}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => setFormData({...formData, conversationsPerDay: parseFloat(e.target.value)})}
+                className="w-full px-3 py-2 border rounded"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-1">Deploy from Month</label>
+              <input
+                type="number"
+                min="1"
+                max="36"
+                value={formData.deployMonth || 1}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => setFormData({...formData, deployMonth: parseInt(e.target.value)})}
+                className="w-full px-3 py-2 border rounded"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium mb-1">Turns per Conversation: {formData.turns || 4}</label>
+              <input
+                type="range"
+                min="2"
+                max="10"
+                value={formData.turns || 4}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => setFormData({...formData, turns: parseInt(e.target.value)})}
+                className="w-full"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-1">Actions per Conversation: {formData.actions || 1}</label>
+              <input
+                type="range"
+                min="0"
+                max="5"
+                step="0.5"
+                value={formData.actions || 1}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => setFormData({...formData, actions: parseFloat(e.target.value)})}
+                className="w-full"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1">Generative AI Ratio: {((formData.generativeRatio || 0.5) * 100).toFixed(0)}%</label>
+            <input
+              type="range"
+              min="0"
+              max="100"
+              value={(formData.generativeRatio || 0.5) * 100}
+              onChange={(e: ChangeEvent<HTMLInputElement>) => setFormData({...formData, generativeRatio: parseInt(e.target.value) / 100})}
+              className="w-full"
+            />
+            <div className="flex justify-between text-xs text-gray-500 mt-1">
+              <span>Scripted (0%)</span>
+              <span>Balanced (50%)</span>
+              <span>AI-Driven (100%)</span>
+            </div>
+          </div>
+
+          <div>
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={formData.tenantGraph || false}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => setFormData({...formData, tenantGraph: e.target.checked})}
+                className="rounded"
+              />
+              <span className="text-sm font-medium">Tenant Graph Grounding (+10 credits/conversation)</span>
+            </label>
+            <p className="text-xs text-gray-500 mt-1">Search across Microsoft 365 data (expensive!)</p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-2">Available to User Segments</label>
+            <div className="flex flex-wrap gap-2">
+              {segments.map(seg => (
+                <label key={seg} className="flex items-center gap-2 px-3 py-2 border rounded hover:bg-gray-50">
+                  <input
+                    type="checkbox"
+                    checked={(formData.segments || []).includes(seg)}
+                    onChange={(e: ChangeEvent<HTMLInputElement>) => {
+                      const currentSegments = formData.segments || [];
+                      if (e.target.checked) {
+                        setFormData({...formData, segments: [...currentSegments, seg]});
+                      } else {
+                        setFormData({...formData, segments: currentSegments.filter(s => s !== seg)});
+                      }
+                    }}
+                  />
+                  <span className="text-sm">{seg}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          <div className="p-4 bg-blue-50 rounded">
+            <p className="text-sm font-semibold text-blue-900">Calculated Credits per Conversation: {calculateCredits()}</p>
+            <p className="text-xs text-blue-700 mt-1">
+              Classic: {((formData.turns || 0) * (1-(formData.generativeRatio || 0))).toFixed(1)}×1 +
+              Gen: {((formData.turns || 0) * (formData.generativeRatio || 0)).toFixed(1)}×2 +
+              Actions: {formData.actions || 0}×5
+              {formData.tenantGraph && ' + Graph: 10'}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex gap-3 mt-6">
+          <button
+            onClick={() => onSave(formData)}
+            disabled={!formData.name || !formData.purpose}
+            className="flex-1 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+          >
+            {agent ? 'Update Agent' : 'Add Agent'}
+          </button>
+          <button
+            onClick={onCancel}
+            className="flex-1 px-4 py-2 border border-gray-300 rounded hover:bg-gray-50"
+          >
+            Cancel
+          </button>
+        </div>
       </div>
     </div>
   );
