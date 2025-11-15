@@ -411,21 +411,9 @@ const CopilotCostCalculator: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Conversations per Day */}
             <div>
-              <div className="flex items-center gap-2 mb-2">
-                <label className="block text-sm font-semibold text-gray-700">
-                  Conversations per Day
-                </label>
-                <div className="group relative">
-                  <svg className="w-4 h-4 text-blue-500 cursor-help" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                  </svg>
-                  <div className="hidden group-hover:block absolute z-10 w-64 p-2 mt-1 text-xs bg-gray-900 text-white rounded shadow-lg">
-                    <div><strong>Low:</strong> {parameterRanges.conversationsPerDay.low}</div>
-                    <div><strong>Medium:</strong> {parameterRanges.conversationsPerDay.medium}</div>
-                    <div><strong>High:</strong> {parameterRanges.conversationsPerDay.high}</div>
-                  </div>
-                </div>
-              </div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Conversations per Day per User: {config.conversationsPerDay}
+              </label>
               <input
                 type="range"
                 min={parameterRanges.conversationsPerDay.min}
@@ -435,30 +423,18 @@ const CopilotCostCalculator: React.FC = () => {
                 onChange={(e: ChangeEvent<HTMLInputElement>) => updateConfig('conversationsPerDay', parseFloat(e.target.value))}
                 className="w-full"
               />
-              <div className="flex justify-between text-sm text-gray-600 mt-1">
-                <span>{parameterRanges.conversationsPerDay.min}</span>
-                <span className="font-semibold">{config.conversationsPerDay}</span>
-                <span>{parameterRanges.conversationsPerDay.max}</span>
+              <div className="flex justify-between text-xs text-gray-500 mt-1">
+                <span>Low (1-2)</span>
+                <span>Medium (3-5)</span>
+                <span>High (6-12)</span>
               </div>
             </div>
 
             {/* Turns per Conversation */}
             <div>
-              <div className="flex items-center gap-2 mb-2">
-                <label className="block text-sm font-semibold text-gray-700">
-                  Turns per Conversation
-                </label>
-                <div className="group relative">
-                  <svg className="w-4 h-4 text-blue-500 cursor-help" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                  </svg>
-                  <div className="hidden group-hover:block absolute z-10 w-64 p-2 mt-1 text-xs bg-gray-900 text-white rounded shadow-lg">
-                    <div><strong>Low:</strong> {parameterRanges.turnsPerConversation.low}</div>
-                    <div><strong>Medium:</strong> {parameterRanges.turnsPerConversation.medium}</div>
-                    <div><strong>High:</strong> {parameterRanges.turnsPerConversation.high}</div>
-                  </div>
-                </div>
-              </div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Turns per Conversation: {config.turnsPerConversation}
+              </label>
               <input
                 type="range"
                 min={parameterRanges.turnsPerConversation.min}
@@ -468,76 +444,51 @@ const CopilotCostCalculator: React.FC = () => {
                 onChange={(e: ChangeEvent<HTMLInputElement>) => updateConfig('turnsPerConversation', parseFloat(e.target.value))}
                 className="w-full"
               />
-              <div className="flex justify-between text-sm text-gray-600 mt-1">
-                <span>{parameterRanges.turnsPerConversation.min}</span>
-                <span className="font-semibold">{config.turnsPerConversation}</span>
-                <span>{parameterRanges.turnsPerConversation.max}</span>
+              <div className="flex justify-between text-xs text-gray-500 mt-1">
+                <span>Simple (2-3)</span>
+                <span>Normal (4-6)</span>
+                <span>Complex (7-10)</span>
               </div>
             </div>
 
             {/* Generative AI Ratio */}
             <div>
-              <div className="flex items-center gap-2 mb-2">
-                <label className="block text-sm font-semibold text-gray-700">
-                  Generative AI Ratio (%)
-                </label>
-                <div className="group relative">
-                  <svg className="w-4 h-4 text-blue-500 cursor-help" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                  </svg>
-                  <div className="hidden group-hover:block absolute z-10 w-64 p-2 mt-1 text-xs bg-gray-900 text-white rounded shadow-lg">
-                    <div><strong>Low:</strong> {parameterRanges.generativeRatio.low}</div>
-                    <div><strong>Medium:</strong> {parameterRanges.generativeRatio.medium}</div>
-                    <div><strong>High:</strong> {parameterRanges.generativeRatio.high}</div>
-                  </div>
-                </div>
-              </div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Generative AI Ratio: {(config.generativeRatio * 100).toFixed(0)}%
+              </label>
               <input
                 type="range"
-                min={parameterRanges.generativeRatio.min}
-                max={parameterRanges.generativeRatio.max}
-                step={parameterRanges.generativeRatio.step}
+                min="0"
+                max="100"
                 value={config.generativeRatio * 100}
-                onChange={(e: ChangeEvent<HTMLInputElement>) => updateConfig('generativeRatio', parseFloat(e.target.value) / 100)}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => updateConfig('generativeRatio', parseInt(e.target.value) / 100)}
                 className="w-full"
               />
-              <div className="flex justify-between text-sm text-gray-600 mt-1">
-                <span>{parameterRanges.generativeRatio.min}%</span>
-                <span className="font-semibold">{(config.generativeRatio * 100).toFixed(0)}%</span>
-                <span>{parameterRanges.generativeRatio.max}%</span>
+              <div className="flex justify-between text-xs text-gray-500 mt-1">
+                <span>Scripted (0-30%)</span>
+                <span>Balanced (40-60%)</span>
+                <span>AI-Driven (70-100%)</span>
               </div>
             </div>
 
             {/* Actions per Conversation */}
             <div>
-              <div className="flex items-center gap-2 mb-2">
-                <label className="block text-sm font-semibold text-gray-700">
-                  Actions per Conversation
-                </label>
-                <div className="group relative">
-                  <svg className="w-4 h-4 text-blue-500 cursor-help" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                  </svg>
-                  <div className="hidden group-hover:block absolute z-10 w-64 p-2 mt-1 text-xs bg-gray-900 text-white rounded shadow-lg">
-                    <div><strong>Low:</strong> {parameterRanges.actionsPerConversation.low}</div>
-                    <div><strong>Medium:</strong> {parameterRanges.actionsPerConversation.medium}</div>
-                    <div><strong>High:</strong> {parameterRanges.actionsPerConversation.high}</div>
-                  </div>
-                </div>
-              </div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Actions per Conversation: {config.actionsPerConversation}
+              </label>
               <input
                 type="range"
-                min={parameterRanges.actionsPerConversation.min}
-                max={parameterRanges.actionsPerConversation.max}
-                step={parameterRanges.actionsPerConversation.step}
+                min="0"
+                max="5"
+                step="0.5"
                 value={config.actionsPerConversation}
                 onChange={(e: ChangeEvent<HTMLInputElement>) => updateConfig('actionsPerConversation', parseFloat(e.target.value))}
                 className="w-full"
               />
-              <div className="flex justify-between text-sm text-gray-600 mt-1">
-                <span>{parameterRanges.actionsPerConversation.min}</span>
-                <span className="font-semibold">{config.actionsPerConversation.toFixed(1)}</span>
-                <span>{parameterRanges.actionsPerConversation.max}</span>
+              <div className="flex justify-between text-xs text-gray-500 mt-1">
+                <span>Info only (0-1)</span>
+                <span>Some actions (1-2)</span>
+                <span>Heavy automation (3-5)</span>
               </div>
             </div>
           </div>
@@ -555,67 +506,38 @@ const CopilotCostCalculator: React.FC = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* M365 Copilot Price */}
                 <div>
-                  <div className="flex items-center gap-2 mb-2">
-                    <label className="block text-sm font-semibold text-gray-700">
-                      M365 Copilot Price ($/user/month)
-                    </label>
-                    <div className="group relative">
-                      <svg className="w-4 h-4 text-blue-500 cursor-help" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                      </svg>
-                      <div className="hidden group-hover:block absolute z-10 w-64 p-2 mt-1 text-xs bg-gray-900 text-white rounded shadow-lg">
-                        <div><strong>Low:</strong> {parameterRanges.m365CopilotPrice.low}</div>
-                        <div><strong>Medium:</strong> {parameterRanges.m365CopilotPrice.medium}</div>
-                        <div><strong>High:</strong> {parameterRanges.m365CopilotPrice.high}</div>
-                      </div>
-                    </div>
-                  </div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    M365 Copilot Price: ${config.m365CopilotPrice}/user/month
+                  </label>
                   <input
-                    type="range"
-                    min={parameterRanges.m365CopilotPrice.min}
-                    max={parameterRanges.m365CopilotPrice.max}
-                    step={parameterRanges.m365CopilotPrice.step}
+                    type="number"
+                    min="25"
+                    max="35"
                     value={config.m365CopilotPrice}
-                    onChange={(e: ChangeEvent<HTMLInputElement>) => updateConfig('m365CopilotPrice', parseFloat(e.target.value))}
-                    className="w-full"
+                    onChange={(e: ChangeEvent<HTMLInputElement>) => updateConfig('m365CopilotPrice', parseInt(e.target.value))}
+                    className="w-full p-2 border rounded bg-white"
                   />
-                  <div className="flex justify-between text-sm text-gray-600 mt-1">
-                    <span>${parameterRanges.m365CopilotPrice.min}</span>
-                    <span className="font-semibold">${config.m365CopilotPrice}</span>
-                    <span>${parameterRanges.m365CopilotPrice.max}</span>
-                  </div>
+                  <p className="text-xs text-gray-500 mt-1">Standard: $30, Volume discount: $25-28</p>
                 </div>
 
                 {/* Autonomous Action Ratio */}
                 <div>
-                  <div className="flex items-center gap-2 mb-2">
-                    <label className="block text-sm font-semibold text-gray-700">
-                      Autonomous Action Ratio (%)
-                    </label>
-                    <div className="group relative">
-                      <svg className="w-4 h-4 text-blue-500 cursor-help" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                      </svg>
-                      <div className="hidden group-hover:block absolute z-10 w-64 p-2 mt-1 text-xs bg-gray-900 text-white rounded shadow-lg">
-                        <div><strong>Low:</strong> {parameterRanges.autonomousActionRatio.low}</div>
-                        <div><strong>Medium:</strong> {parameterRanges.autonomousActionRatio.medium}</div>
-                        <div><strong>High:</strong> {parameterRanges.autonomousActionRatio.high}</div>
-                      </div>
-                    </div>
-                  </div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Autonomous Action Ratio: {(config.autonomousActionRatio * 100).toFixed(0)}%
+                  </label>
                   <input
                     type="range"
-                    min={parameterRanges.autonomousActionRatio.min}
-                    max={parameterRanges.autonomousActionRatio.max}
-                    step={parameterRanges.autonomousActionRatio.step}
+                    min="0"
+                    max="50"
+                    step="5"
                     value={config.autonomousActionRatio * 100}
                     onChange={(e: ChangeEvent<HTMLInputElement>) => updateConfig('autonomousActionRatio', parseFloat(e.target.value) / 100)}
                     className="w-full"
                   />
-                  <div className="flex justify-between text-sm text-gray-600 mt-1">
-                    <span>{parameterRanges.autonomousActionRatio.min}%</span>
-                    <span className="font-semibold">{(config.autonomousActionRatio * 100).toFixed(0)}%</span>
-                    <span>{parameterRanges.autonomousActionRatio.max}%</span>
+                  <div className="flex justify-between text-xs text-gray-500 mt-1">
+                    <span>User-triggered (0-10%)</span>
+                    <span>Some automation (10-20%)</span>
+                    <span>Highly autonomous (25-50%)</span>
                   </div>
                 </div>
 
@@ -913,28 +835,28 @@ const CopilotCostCalculator: React.FC = () => {
           Strategic Recommendations
         </h2>
 
-        <div className="space-y-4">
-          <div className="border-l-4 border-green-500 pl-4">
-            <h3 className="font-semibold text-gray-900 mb-2">Winner by Stage</h3>
-            <p className="text-gray-700">
+        <div className="space-y-3">
+          <div className="bg-green-50 p-3 rounded-lg">
+            <h4 className="font-semibold text-green-900 mb-1">Winner by Stage</h4>
+            <p className="text-sm text-green-800">
               <strong>Best Overall:</strong> {cheapestModel.model} with 3-year total of {formatCurrency(cheapestModel.total)}.
               {cheapestModel.model.includes('PAYG') && ' PAYG models offer cost advantages at lower usage levels.'}
               {cheapestModel.model.includes('M365') && ' Hybrid models balance license costs with usage-based pricing.'}
             </p>
           </div>
 
-          <div className="border-l-4 border-blue-500 pl-4">
-            <h3 className="font-semibold text-gray-900 mb-2">Breakeven Analysis</h3>
-            <p className="text-gray-700">
+          <div className="bg-blue-50 p-3 rounded-lg">
+            <h4 className="font-semibold text-blue-900 mb-1">Breakeven Analysis</h4>
+            <p className="text-sm text-blue-800">
               At {creditsPerConversation.toFixed(1)} credits/conversation, monitor monthly consumption closely.
               M365 Copilot ($30/user/month) becomes cost-effective at 3,000 credits/user/month.
               Hybrid models optimize costs by giving M365 licenses to power users while using PAYG for occasional users.
             </p>
           </div>
 
-          <div className="border-l-4 border-yellow-500 pl-4">
-            <h3 className="font-semibold text-gray-900 mb-2">Recommended Phased Strategy</h3>
-            <ul className="list-disc list-inside text-gray-700 space-y-1">
+          <div className="bg-yellow-50 p-3 rounded-lg">
+            <h4 className="font-semibold text-yellow-900 mb-1">Recommended Phased Strategy</h4>
+            <ul className="list-disc list-inside text-sm text-yellow-800 space-y-1">
               <li><strong>Pilot (Month 1-3):</strong> Start with PAYG to measure actual usage patterns</li>
               <li><strong>Expansion (Month 4-9):</strong> Continue PAYG, consider P3 if usage is consistent</li>
               <li><strong>Management (Month 10-18):</strong> Evaluate hybrid models for power users</li>
@@ -942,9 +864,9 @@ const CopilotCostCalculator: React.FC = () => {
             </ul>
           </div>
 
-          <div className="border-l-4 border-purple-500 pl-4">
-            <h3 className="font-semibold text-gray-900 mb-2">3-Year Total Comparison</h3>
-            <p className="text-gray-700">
+          <div className="bg-purple-50 p-3 rounded-lg">
+            <h4 className="font-semibold text-purple-900 mb-1">3-Year Total Comparison</h4>
+            <p className="text-sm text-purple-800">
               Savings from {cheapestModel.model} vs most expensive: {formatCurrency(
                 pricingSummary.reduce((max, curr) => curr.total > max.total ? curr : max).total - cheapestModel.total
               )}. The choice depends on your organization's M365 licensing strategy and predicted usage growth.
