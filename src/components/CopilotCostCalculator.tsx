@@ -1705,37 +1705,6 @@ const CopilotCostCalculator: React.FC = () => {
           </div>
         </div>
       )}
-
-      {/* Cost Optimization Tips */}
-      <div className="bg-white rounded-lg shadow-lg p-6">
-        <h2 className="text-xl font-bold text-gray-900 mb-4">
-          Cost Optimization Tips
-        </h2>
-
-        <ul className="list-disc list-inside text-gray-700 space-y-2">
-          <li>
-            <strong>Classic vs Generative Turns:</strong> Classic responses (1 credit) cost 50% less than generative (2 credits). Design agents to use classic responses for FAQ-style queries and reserve generative AI for complex problem-solving.
-          </li>
-          <li>
-            <strong>Action Usage Best Practices:</strong> Actions cost 5 credits each. Batch multiple data operations into single actions where possible. Cache frequently-accessed data to reduce redundant action calls.
-          </li>
-          <li>
-            <strong>Peak Month Planning:</strong> Plan for {((config.peakMultiplier - 1) * 100).toFixed(0)}% usage spikes every 6 months. Consider P3 pre-purchase (15% discount) if your baseline usage is predictable.
-          </li>
-          <li>
-            <strong>When to Switch: PAYG → P3:</strong> P3 pre-purchase offers 15% savings. Switch when monthly usage is consistent (±20%) for 3+ months. The discount offsets the commitment risk.
-          </li>
-          <li>
-            <strong>When to Add M365 Licenses (Hybrid):</strong> Give M365 Copilot licenses to users consuming &gt;3,000 credits/month. For hybrid models, only autonomous actions ({(config.autonomousActionRatio * 100).toFixed(0)}% of actions) incur credits for licensed users.
-          </li>
-          <li>
-            <strong>Autonomous Action Optimization:</strong> With M365 licenses, user-triggered actions are free - only autonomous (scheduled/background) actions incur credits. Design workflows to maximize user-triggered interactions.
-          </li>
-          <li>
-            <strong>Dev/Test/Prod Separation:</strong> Separate development and testing environments from production billing. Use mock responses in dev/test to avoid consuming production credits during agent development.
-          </li>
-        </ul>
-      </div>
     </div>
   );
 };
