@@ -59,6 +59,7 @@ interface Agent {
   deployMonth: number;
   segments: string[];
   color: string;
+  enabled: boolean;
 }
 
 interface AgentMonthlyCost {
@@ -91,7 +92,6 @@ const CopilotCostCalculator: React.FC = () => {
     hybridM365Users: 200
   });
 
-  const [agentCount, setAgentCount] = useState<number>(10);
   const [showAdvanced, setShowAdvanced] = useState<boolean>(false);
   const [showStageEditor, setShowStageEditor] = useState<boolean>(false);
   const [showRolloutPlan, setShowRolloutPlan] = useState<boolean>(false);
@@ -112,7 +112,8 @@ const CopilotCostCalculator: React.FC = () => {
       tenantGraph: false,
       deployMonth: 1,
       segments: ['HQ', 'Management', 'Stores', 'All'],
-      color: '#8b5cf6'
+      color: '#8b5cf6',
+      enabled: true
     },
     {
       id: 2,
@@ -125,7 +126,8 @@ const CopilotCostCalculator: React.FC = () => {
       tenantGraph: false,
       deployMonth: 1,
       segments: ['HQ', 'Management', 'Stores', 'All'],
-      color: '#3b82f6'
+      color: '#3b82f6',
+      enabled: true
     },
     {
       id: 3,
@@ -138,7 +140,8 @@ const CopilotCostCalculator: React.FC = () => {
       tenantGraph: true,
       deployMonth: 4,
       segments: ['HQ', 'Management'],
-      color: '#f59e0b'
+      color: '#f59e0b',
+      enabled: true
     },
     {
       id: 4,
@@ -151,7 +154,8 @@ const CopilotCostCalculator: React.FC = () => {
       tenantGraph: false,
       deployMonth: 5,
       segments: ['HQ', 'Management'],
-      color: '#22c55e'
+      color: '#22c55e',
+      enabled: true
     },
     {
       id: 5,
@@ -164,7 +168,8 @@ const CopilotCostCalculator: React.FC = () => {
       tenantGraph: false,
       deployMonth: 2,
       segments: ['HQ', 'Management', 'Stores', 'All'],
-      color: '#ef4444'
+      color: '#ef4444',
+      enabled: true
     }
   ]);
 
@@ -205,6 +210,10 @@ const CopilotCostCalculator: React.FC = () => {
 
   const deleteAgent = (id: number) => {
     setAgents(agents.filter(a => a.id !== id));
+  };
+
+  const toggleAgent = (id: number) => {
+    setAgents(agents.map(a => a.id === id ? { ...a, enabled: !a.enabled } : a));
   };
 
   // Parameter ranges with market research guidance
@@ -423,6 +432,11 @@ const CopilotCostCalculator: React.FC = () => {
       let totalCost = 0;
 
       agents.forEach(agent => {
+        // Only include enabled agents
+        if (!agent.enabled) {
+          return;
+        }
+
         // Check if agent is deployed this month
         if (month < agent.deployMonth) {
           return;
@@ -482,7 +496,7 @@ const CopilotCostCalculator: React.FC = () => {
 
   // Calculate 3-year agent cost summary
   const agent3YearSummary = useMemo(() => {
-    const summary = agents.map(agent => {
+    const summary = agents.filter(agent => agent.enabled).map(agent => {
       let year1 = 0, year2 = 0, year3 = 0;
 
       agentMonthlyCosts.forEach(({ month, agentCosts }) => {
@@ -574,26 +588,67 @@ const CopilotCostCalculator: React.FC = () => {
           </p>
         </div>
 
-        {/* Deployment Configuration */}
-        <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
-          <h3 className="text-lg font-semibold text-gray-800 mb-4">Deployment Configuration</h3>
+        {/* Agent Portfolio Selection */}
+        <div className="mb-6 p-4 bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg border-2 border-purple-200">
+          <h3 className="text-lg font-semibold text-gray-800 mb-3">🤖 Agent Portfolio Selection</h3>
+          <p className="text-sm text-gray-600 mb-4">Select which agents to include in your cost projection. Each agent has unique usage patterns that impact consumption costs.</p>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Number of Agents
-              </label>
-              <select
-                value={agentCount}
-                onChange={(e: ChangeEvent<HTMLSelectElement>) => setAgentCount(parseInt(e.target.value))}
-                className="w-full p-2 border rounded-lg bg-white"
-              >
-                <option value={10}>10 agents</option>
-                <option value={30}>30 agents</option>
-                <option value={100}>100 agents</option>
-              </select>
-              <p className="text-xs text-gray-500 mt-1">Number of copilot agents deployed</p>
+          <div className="space-y-3">
+            {agents.map(agent => (
+              <div key={agent.id} className="bg-white rounded-lg p-4 border border-gray-200 hover:border-purple-300 transition-colors">
+                <div className="flex items-start gap-3">
+                  <input
+                    type="checkbox"
+                    checked={agent.enabled}
+                    onChange={() => toggleAgent(agent.id)}
+                    className="mt-1 w-5 h-5 text-purple-600 rounded focus:ring-purple-500"
+                  />
+                  <div className="flex-1">
+                    <div className="flex items-center gap-3 mb-1">
+                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: agent.color }}></div>
+                      <h4 className="font-semibold text-gray-900">{agent.name}</h4>
+                      <span className="text-xs px-2 py-0.5 bg-gray-100 text-gray-600 rounded">
+                        Deploy Month {agent.deployMonth}
+                      </span>
+                    </div>
+                    <p className="text-sm text-gray-600 mb-2">{agent.purpose}</p>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+                      <div className="bg-gray-50 px-2 py-1 rounded">
+                        <span className="text-gray-500">Conv/day:</span>
+                        <span className="ml-1 font-medium text-gray-900">{agent.conversationsPerDay}</span>
+                      </div>
+                      <div className="bg-gray-50 px-2 py-1 rounded">
+                        <span className="text-gray-500">Turns:</span>
+                        <span className="ml-1 font-medium text-gray-900">{agent.turns}</span>
+                      </div>
+                      <div className="bg-gray-50 px-2 py-1 rounded">
+                        <span className="text-gray-500">Actions:</span>
+                        <span className="ml-1 font-medium text-gray-900">{agent.actions}</span>
+                      </div>
+                      <div className="bg-purple-50 px-2 py-1 rounded">
+                        <span className="text-gray-500">Credits/Conv:</span>
+                        <span className="ml-1 font-medium text-purple-700">{calculateAgentCredits(agent).toFixed(1)}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-4 p-3 bg-white rounded-lg border border-purple-200">
+            <div className="flex items-center justify-between text-sm">
+              <span className="font-medium text-gray-700">Selected Agents:</span>
+              <span className="font-bold text-purple-700">{agents.filter(a => a.enabled).length} of {agents.length}</span>
             </div>
+          </div>
+        </div>
+
+        {/* User Rollout Configuration */}
+        <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
+          <h3 className="text-lg font-semibold text-gray-800 mb-4">👥 User Rollout Configuration</h3>
+
+          <div className="grid grid-cols-1 md:grid-cols-1 gap-4 mb-4">
 
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
@@ -1257,23 +1312,23 @@ const CopilotCostCalculator: React.FC = () => {
               <h3 className="text-lg font-semibold mb-3 text-blue-900">📊 Agent Portfolio Overview</h3>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="bg-white rounded-lg p-4 shadow-sm">
-                  <div className="text-sm text-gray-600 mb-1">Total Portfolio</div>
-                  <div className="text-2xl font-bold text-blue-900">{agents.length} Agents</div>
+                  <div className="text-sm text-gray-600 mb-1">Enabled Agents</div>
+                  <div className="text-2xl font-bold text-blue-900">{agents.filter(a => a.enabled).length} of {agents.length}</div>
                   <div className="text-xs text-gray-500 mt-1">
-                    Avg: {agents.length > 0 ? (agents.reduce((s, a) => s + calculateAgentCredits(a), 0) / agents.length).toFixed(1) : 0} credits/conv
+                    Avg: {agents.filter(a => a.enabled).length > 0 ? (agents.filter(a => a.enabled).reduce((s, a) => s + calculateAgentCredits(a), 0) / agents.filter(a => a.enabled).length).toFixed(1) : 0} credits/conv
                   </div>
                 </div>
                 <div className="bg-white rounded-lg p-4 shadow-sm">
                   <div className="text-sm text-gray-600 mb-1">Complexity Range</div>
                   <div className="text-2xl font-bold text-blue-900">
-                    {agents.length > 0 ? Math.min(...agents.map(a => calculateAgentCredits(a))).toFixed(1) : 0} - {agents.length > 0 ? Math.max(...agents.map(a => calculateAgentCredits(a))).toFixed(1) : 0}
+                    {agents.filter(a => a.enabled).length > 0 ? Math.min(...agents.filter(a => a.enabled).map(a => calculateAgentCredits(a))).toFixed(1) : 0} - {agents.filter(a => a.enabled).length > 0 ? Math.max(...agents.filter(a => a.enabled).map(a => calculateAgentCredits(a))).toFixed(1) : 0}
                   </div>
                   <div className="text-xs text-gray-500 mt-1">Credits per conversation range</div>
                 </div>
                 <div className="bg-white rounded-lg p-4 shadow-sm">
                   <div className="text-sm text-gray-600 mb-1">Using Tenant Graph</div>
                   <div className="text-2xl font-bold text-blue-900">
-                    {agents.filter(a => a.tenantGraph).length} / {agents.length}
+                    {agents.filter(a => a.enabled && a.tenantGraph).length} / {agents.filter(a => a.enabled).length}
                   </div>
                   <div className="text-xs text-gray-500 mt-1">+10 credits/conversation each</div>
                 </div>
@@ -1295,7 +1350,7 @@ const CopilotCostCalculator: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {agents.map(agent => {
+                    {agents.filter(a => a.enabled).map(agent => {
                       const credits = calculateAgentCredits(agent);
                       return (
                         <tr key={agent.id} className="border-b hover:bg-gray-50">
@@ -1332,14 +1387,14 @@ const CopilotCostCalculator: React.FC = () => {
                 <div className="bg-white p-4 rounded shadow-sm">
                   <p className="font-semibold mb-2">📊 Your Agent Portfolio:</p>
                   <ul className="list-disc list-inside space-y-1 ml-2">
-                    <li><strong>{agents.length} agents</strong> deployed across rollout phases</li>
-                    {agents.length > 0 && (
+                    <li><strong>{agents.filter(a => a.enabled).length} enabled agents</strong> deployed across rollout phases</li>
+                    {agents.filter(a => a.enabled).length > 0 && (
                       <>
-                        <li><strong>Most complex:</strong> {agents.sort((a, b) => calculateAgentCredits(b) - calculateAgentCredits(a))[0]?.name} ({calculateAgentCredits(agents.sort((a, b) => calculateAgentCredits(b) - calculateAgentCredits(a))[0]).toFixed(1)} credits/conv)</li>
-                        <li><strong>Most efficient:</strong> {agents.sort((a, b) => calculateAgentCredits(a) - calculateAgentCredits(b))[0]?.name} ({calculateAgentCredits(agents.sort((a, b) => calculateAgentCredits(a) - calculateAgentCredits(b))[0]).toFixed(1)} credits/conv)</li>
+                        <li><strong>Most complex:</strong> {agents.filter(a => a.enabled).sort((a, b) => calculateAgentCredits(b) - calculateAgentCredits(a))[0]?.name} ({calculateAgentCredits(agents.filter(a => a.enabled).sort((a, b) => calculateAgentCredits(b) - calculateAgentCredits(a))[0]).toFixed(1)} credits/conv)</li>
+                        <li><strong>Most efficient:</strong> {agents.filter(a => a.enabled).sort((a, b) => calculateAgentCredits(a) - calculateAgentCredits(b))[0]?.name} ({calculateAgentCredits(agents.filter(a => a.enabled).sort((a, b) => calculateAgentCredits(a) - calculateAgentCredits(b))[0]).toFixed(1)} credits/conv)</li>
                       </>
                     )}
-                    <li><strong>Avg complexity:</strong> {agents.length > 0 ? (agents.reduce((s, a) => s + calculateAgentCredits(a), 0) / agents.length).toFixed(1) : 0} credits/conversation</li>
+                    <li><strong>Avg complexity:</strong> {agents.filter(a => a.enabled).length > 0 ? (agents.filter(a => a.enabled).reduce((s, a) => s + calculateAgentCredits(a), 0) / agents.filter(a => a.enabled).length).toFixed(1) : 0} credits/conversation</li>
                   </ul>
                 </div>
 
@@ -1359,7 +1414,7 @@ const CopilotCostCalculator: React.FC = () => {
       </div>
 
       {/* Cost Breakdown by Agent (Monthly, PAYG Pricing) */}
-      {showAgentPortfolio && agents.length > 0 && (
+      {showAgentPortfolio && agents.filter(a => a.enabled).length > 0 && (
         <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
           <h2 className="text-xl font-bold text-gray-900 mb-4">
             Cost Breakdown by Agent (Monthly, PAYG Pricing)
