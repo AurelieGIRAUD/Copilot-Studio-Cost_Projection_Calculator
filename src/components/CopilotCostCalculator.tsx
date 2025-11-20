@@ -1333,6 +1333,117 @@ const CopilotCostCalculator: React.FC = () => {
         </div>
       </div>
 
+      {/* Cost Breakdown by Agent (Monthly, PAYG Pricing) */}
+      {showAgentPortfolio && agents.filter(a => a.enabled).length > 0 && (
+        <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
+          <h2 className="text-xl font-bold text-gray-900 mb-4">
+            Cost Breakdown by Agent (Monthly, PAYG Pricing)
+          </h2>
+
+          <div className="mb-6">
+            <p className="text-sm text-gray-600 mb-4">
+              This shows the actual monthly cost in dollars for each agent, accounting for deployment timing and user segment access.
+            </p>
+
+            {/* Chart: Agent Monthly Costs */}
+            <ResponsiveContainer width="100%" height={400}>
+              <LineChart
+                data={agentMonthlyCosts}
+                margin={{ top: 20, right: 30, left: 60, bottom: 60 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis
+                  dataKey="month"
+                  label={{ value: 'Month', position: 'insideBottom', offset: -10 }}
+                />
+                <YAxis
+                  label={{ value: 'Monthly Cost ($)', angle: -90, position: 'insideLeft', offset: 10 }}
+                  tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
+                />
+                <Tooltip
+                  formatter={(value: number) => formatCurrency(value)}
+                  labelFormatter={(month: number) => `Month ${month}`}
+                />
+                <Legend
+                  verticalAlign="top"
+                  height={36}
+                  wrapperStyle={{ paddingBottom: '10px' }}
+                />
+                {agents.map(agent => (
+                  <Line
+                    key={agent.id}
+                    type="monotone"
+                    dataKey={(data: AgentMonthlyCost) => {
+                      const agentCost = data.agentCosts.find(ac => ac.agentId === agent.id);
+                      return agentCost?.cost || 0;
+                    }}
+                    stroke={agent.color}
+                    strokeWidth={2}
+                    name={agent.name}
+                    dot={false}
+                  />
+                ))}
+                <Line
+                  type="monotone"
+                  dataKey="totalCost"
+                  stroke="#000000"
+                  strokeWidth={3}
+                  strokeDasharray="5 5"
+                  name="Total Portfolio Cost"
+                  dot={false}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* Sample Month Breakdown Table */}
+          <div className="bg-gray-50 rounded-lg p-4">
+            <h3 className="font-semibold text-gray-900 mb-3">Month 12 Cost Breakdown (Example)</h3>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-200">
+                  <tr>
+                    <th className="p-3 text-left">Agent</th>
+                    <th className="p-3 text-right">Deploy Month</th>
+                    <th className="p-3 text-right">Credits/Conv</th>
+                    <th className="p-3 text-right">Monthly Cost</th>
+                    <th className="p-3 text-right">% of Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {agentMonthlyCosts[11]?.agentCosts
+                    .sort((a, b) => b.cost - a.cost)
+                    .map(agentCost => {
+                      const agent = agents.find(a => a.id === agentCost.agentId);
+                      if (!agent) return null;
+                      const percentage = ((agentCost.cost / agentMonthlyCosts[11].totalCost) * 100).toFixed(1);
+                      return (
+                        <tr key={agentCost.agentId} className="border-b hover:bg-gray-100">
+                          <td className="p-3">
+                            <div className="flex items-center gap-2">
+                              <div className="w-3 h-3 rounded-full" style={{ backgroundColor: agentCost.color }}></div>
+                              <span className="font-medium">{agentCost.agentName}</span>
+                            </div>
+                          </td>
+                          <td className="p-3 text-right">Month {agent.deployMonth}</td>
+                          <td className="p-3 text-right font-mono">{calculateAgentCredits(agent).toFixed(1)}</td>
+                          <td className="p-3 text-right font-mono">{formatCurrency(agentCost.cost)}</td>
+                          <td className="p-3 text-right">{percentage}%</td>
+                        </tr>
+                      );
+                    })}
+                  <tr className="bg-gray-200 font-bold">
+                    <td className="p-3" colSpan={3}>Total Portfolio Cost (Month 12)</td>
+                    <td className="p-3 text-right">{formatCurrency(agentMonthlyCosts[11]?.totalCost || 0)}</td>
+                    <td className="p-3 text-right">100%</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Strategic Recommendations */}
       <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
         <h2 className="text-xl font-bold text-gray-900 mb-4">
@@ -1379,13 +1490,13 @@ const CopilotCostCalculator: React.FC = () => {
         </div>
       </div>
 
-      {/* Agent Portfolio Cost Assessment */}
+      {/* Agents Configuration */}
       <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
         <button
           onClick={() => setShowAgentPortfolio(!showAgentPortfolio)}
           className="text-xl font-bold text-gray-900 mb-4 hover:text-blue-600 transition-colors flex items-center gap-2"
         >
-          {showAgentPortfolio ? '▼' : '▶'} Agent Portfolio Cost Assessment
+          {showAgentPortfolio ? '▼' : '▶'} Agents Configuration
         </button>
 
         {showAgentPortfolio && (
@@ -1514,197 +1625,6 @@ const CopilotCostCalculator: React.FC = () => {
         )}
       </div>
 
-      {/* Cost Breakdown by Agent (Monthly, PAYG Pricing) */}
-      {showAgentPortfolio && agents.filter(a => a.enabled).length > 0 && (
-        <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
-          <h2 className="text-xl font-bold text-gray-900 mb-4">
-            Cost Breakdown by Agent (Monthly, PAYG Pricing)
-          </h2>
-
-          <div className="mb-6">
-            <p className="text-sm text-gray-600 mb-4">
-              This shows the actual monthly cost in dollars for each agent, accounting for deployment timing and user segment access.
-            </p>
-
-            {/* Chart: Agent Monthly Costs */}
-            <ResponsiveContainer width="100%" height={400}>
-              <LineChart
-                data={agentMonthlyCosts}
-                margin={{ top: 20, right: 30, left: 60, bottom: 60 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis
-                  dataKey="month"
-                  label={{ value: 'Month', position: 'insideBottom', offset: -10 }}
-                />
-                <YAxis
-                  label={{ value: 'Monthly Cost ($)', angle: -90, position: 'insideLeft', offset: 10 }}
-                  tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
-                />
-                <Tooltip
-                  formatter={(value: number) => formatCurrency(value)}
-                  labelFormatter={(month: number) => `Month ${month}`}
-                />
-                <Legend
-                  verticalAlign="top"
-                  height={36}
-                  wrapperStyle={{ paddingBottom: '10px' }}
-                />
-                {agents.map(agent => (
-                  <Line
-                    key={agent.id}
-                    type="monotone"
-                    dataKey={(data: AgentMonthlyCost) => {
-                      const agentCost = data.agentCosts.find(ac => ac.agentId === agent.id);
-                      return agentCost?.cost || 0;
-                    }}
-                    stroke={agent.color}
-                    strokeWidth={2}
-                    name={agent.name}
-                    dot={false}
-                  />
-                ))}
-                <Line
-                  type="monotone"
-                  dataKey="totalCost"
-                  stroke="#000000"
-                  strokeWidth={3}
-                  strokeDasharray="5 5"
-                  name="Total Portfolio Cost"
-                  dot={false}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-
-          {/* Sample Month Breakdown Table */}
-          <div className="bg-gray-50 rounded-lg p-4">
-            <h3 className="font-semibold text-gray-900 mb-3">Month 12 Cost Breakdown (Example)</h3>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-gray-200">
-                  <tr>
-                    <th className="p-3 text-left">Agent</th>
-                    <th className="p-3 text-right">Deploy Month</th>
-                    <th className="p-3 text-right">Credits/Conv</th>
-                    <th className="p-3 text-right">Monthly Cost</th>
-                    <th className="p-3 text-right">% of Total</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {agentMonthlyCosts[11]?.agentCosts
-                    .sort((a, b) => b.cost - a.cost)
-                    .map(agentCost => {
-                      const agent = agents.find(a => a.id === agentCost.agentId);
-                      if (!agent) return null;
-                      const percentage = ((agentCost.cost / agentMonthlyCosts[11].totalCost) * 100).toFixed(1);
-                      return (
-                        <tr key={agentCost.agentId} className="border-b hover:bg-gray-100">
-                          <td className="p-3">
-                            <div className="flex items-center gap-2">
-                              <div className="w-3 h-3 rounded-full" style={{ backgroundColor: agentCost.color }}></div>
-                              <span className="font-medium">{agentCost.agentName}</span>
-                            </div>
-                          </td>
-                          <td className="p-3 text-right">Month {agent.deployMonth}</td>
-                          <td className="p-3 text-right font-mono">{calculateAgentCredits(agent).toFixed(1)}</td>
-                          <td className="p-3 text-right font-mono">{formatCurrency(agentCost.cost)}</td>
-                          <td className="p-3 text-right">{percentage}%</td>
-                        </tr>
-                      );
-                    })}
-                  <tr className="bg-gray-200 font-bold">
-                    <td className="p-3" colSpan={3}>Total Portfolio Cost (Month 12)</td>
-                    <td className="p-3 text-right">{formatCurrency(agentMonthlyCosts[11]?.totalCost || 0)}</td>
-                    <td className="p-3 text-right">100%</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Impact on Licensing Options */}
-      {showAgentPortfolio && agents.length > 0 && (
-        <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
-          <h2 className="text-xl font-bold text-gray-900 mb-4">
-            Credits/User Evolution
-          </h2>
-
-          {/* Evolution Over Time */}
-          <div className="bg-white rounded-lg border-2 border-blue-200 p-5 mt-6">
-            <h3 className="font-semibold text-gray-900 mb-3">📈 Credits/User Evolution (Changes with User Growth)</h3>
-            <p className="text-sm text-gray-600 mb-4">
-              These metrics change as your user base grows and agents deploy. The calculations are based on actual monthly costs divided by active users.
-            </p>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-blue-100">
-                  <tr>
-                    <th className="p-3 text-left">Milestone</th>
-                    <th className="p-3 text-right">Total Users</th>
-                    <th className="p-3 text-right">Agents Deployed</th>
-                    <th className="p-3 text-right">Credits/User/Month</th>
-                    <th className="p-3 text-right">Cost/User/Month</th>
-                    <th className="p-3 text-right">Recommendation</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr className="border-b hover:bg-gray-50">
-                    <td className="p-3 font-medium">Month 12 (End of Year 1)</td>
-                    <td className="p-3 text-right">{formatNumber(monthlyData[11]?.users || 0)}</td>
-                    <td className="p-3 text-right">{agents.filter(a => a.deployMonth <= 12).length} of {agents.length}</td>
-                    <td className="p-3 text-right font-mono">{formatNumber(licensingImpact.month12.creditsPerUser)}</td>
-                    <td className="p-3 text-right font-mono">${licensingImpact.month12.costPerUser.toFixed(2)}</td>
-                    <td className="p-3 text-right">
-                      <span className={`px-2 py-1 rounded text-xs font-semibold ${
-                        licensingImpact.month12.creditsPerUser > 3000 ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
-                      }`}>
-                        {licensingImpact.month12.creditsPerUser > 3000 ? 'M365' : 'PAYG'}
-                      </span>
-                    </td>
-                  </tr>
-                  <tr className="border-b hover:bg-gray-50 bg-blue-50">
-                    <td className="p-3 font-medium">Month 24 (End of Year 2)</td>
-                    <td className="p-3 text-right">{formatNumber(monthlyData[23]?.users || 0)}</td>
-                    <td className="p-3 text-right">{agents.filter(a => a.deployMonth <= 24).length} of {agents.length}</td>
-                    <td className="p-3 text-right font-mono">{formatNumber(licensingImpact.month24.creditsPerUser)}</td>
-                    <td className="p-3 text-right font-mono">${licensingImpact.month24.costPerUser.toFixed(2)}</td>
-                    <td className="p-3 text-right">
-                      <span className={`px-2 py-1 rounded text-xs font-semibold ${
-                        licensingImpact.month24.creditsPerUser > 3000 ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
-                      }`}>
-                        {licensingImpact.month24.creditsPerUser > 3000 ? 'M365' : 'PAYG'}
-                      </span>
-                    </td>
-                  </tr>
-                  <tr className="border-b hover:bg-gray-50">
-                    <td className="p-3 font-medium">Month 36 (End of Year 3)</td>
-                    <td className="p-3 text-right">{formatNumber(monthlyData[35]?.users || 0)}</td>
-                    <td className="p-3 text-right">{agents.length} of {agents.length}</td>
-                    <td className="p-3 text-right font-mono">{formatNumber(licensingImpact.month36.creditsPerUser)}</td>
-                    <td className="p-3 text-right font-mono">${licensingImpact.month36.costPerUser.toFixed(2)}</td>
-                    <td className="p-3 text-right">
-                      <span className={`px-2 py-1 rounded text-xs font-semibold ${
-                        licensingImpact.month36.creditsPerUser > 3000 ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
-                      }`}>
-                        {licensingImpact.month36.creditsPerUser > 3000 ? 'M365' : 'PAYG'}
-                      </span>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-            <div className="mt-3 bg-gray-50 rounded p-3">
-              <p className="text-xs text-gray-600">
-                <strong>💡 Key Insight:</strong> Credits per user can actually <strong>decrease</strong> as you scale if agents with segment restrictions
-                (like "HQ only") deploy later while your user base grows. Early pilots with all-access agents show higher per-user costs.
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
