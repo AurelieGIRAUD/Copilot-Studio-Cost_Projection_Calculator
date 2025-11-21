@@ -602,10 +602,19 @@ const CopilotCostCalculator: React.FC = () => {
           {showSettings && (
             <div className="mt-4 space-y-6">
 
-        {/* Agent Portfolio Selection */}
+        {/* Agent Configuration & Selection */}
         <div className="mb-6 p-4 bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg border-2 border-purple-200">
-          <h3 className="text-lg font-semibold text-gray-800 mb-3">🤖 Agent Portfolio Selection</h3>
-          <p className="text-sm text-gray-600 mb-4">Select which agents to include in your cost projection. Each agent has unique usage patterns that impact consumption costs.</p>
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-lg font-semibold text-gray-800">🤖 Agent Configuration & Selection</h3>
+            <button
+              onClick={() => setShowAddAgent(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              <Plus size={18} />
+              Add Agent
+            </button>
+          </div>
+          <p className="text-sm text-gray-600 mb-4">Configure your agent portfolio and select which agents to include in your cost projection. Each agent has unique usage patterns that impact consumption costs.</p>
 
           <div className="space-y-3">
             {agents.map(agent => (
@@ -618,42 +627,103 @@ const CopilotCostCalculator: React.FC = () => {
                     className="mt-1 w-5 h-5 text-purple-600 rounded focus:ring-purple-500"
                   />
                   <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-1">
+                    <div className="flex items-center gap-3 mb-2">
                       <div className="w-3 h-3 rounded-full" style={{ backgroundColor: agent.color }}></div>
                       <h4 className="font-semibold text-gray-900">{agent.name}</h4>
-                      <span className="text-xs px-2 py-0.5 bg-gray-100 text-gray-600 rounded">
-                        Deploy Month {agent.deployMonth}
+                      <span className="text-xs px-2 py-1 bg-gray-100 text-gray-600 rounded">
+                        Month {agent.deployMonth}+
                       </span>
                     </div>
-                    <p className="text-sm text-gray-600 mb-2">{agent.purpose}</p>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
-                      <div className="bg-gray-50 px-2 py-1 rounded">
-                        <span className="text-gray-500">Conv/day:</span>
-                        <span className="ml-1 font-medium text-gray-900">{agent.conversationsPerDay}</span>
+                    <p className="text-sm text-gray-600 mb-3">{agent.purpose}</p>
+
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+                      <div>
+                        <span className="text-gray-500">Conversations/day:</span>
+                        <span className="ml-1 font-medium">{agent.conversationsPerDay}</span>
                       </div>
-                      <div className="bg-gray-50 px-2 py-1 rounded">
+                      <div>
                         <span className="text-gray-500">Turns:</span>
-                        <span className="ml-1 font-medium text-gray-900">{agent.turns}</span>
+                        <span className="ml-1 font-medium">{agent.turns}</span>
                       </div>
-                      <div className="bg-gray-50 px-2 py-1 rounded">
+                      <div>
+                        <span className="text-gray-500">Generative:</span>
+                        <span className="ml-1 font-medium">{(agent.generativeRatio * 100).toFixed(0)}%</span>
+                      </div>
+                      <div>
                         <span className="text-gray-500">Actions:</span>
-                        <span className="ml-1 font-medium text-gray-900">{agent.actions}</span>
+                        <span className="ml-1 font-medium">{agent.actions}</span>
                       </div>
-                      <div className="bg-purple-50 px-2 py-1 rounded">
+                      <div>
+                        <span className="text-gray-500">Tenant Graph:</span>
+                        <span className="ml-1 font-medium">{agent.tenantGraph ? 'Yes' : 'No'}</span>
+                      </div>
+                      <div>
                         <span className="text-gray-500">Credits/Conv:</span>
                         <span className="ml-1 font-medium text-purple-700">{calculateAgentCredits(agent).toFixed(1)}</span>
                       </div>
+                      <div className="col-span-2">
+                        <span className="text-gray-500">Segments:</span>
+                        <span className="ml-1 font-medium">{agent.segments.join(', ')}</span>
+                      </div>
                     </div>
+                  </div>
+
+                  <div className="flex gap-2 ml-4">
+                    <button
+                      onClick={() => setEditingAgent(agent)}
+                      className="p-2 text-gray-600 hover:bg-gray-100 rounded transition-colors"
+                    >
+                      <Edit2 size={16} />
+                    </button>
+                    <button
+                      onClick={() => deleteAgent(agent.id)}
+                      className="p-2 text-red-600 hover:bg-red-50 rounded transition-colors"
+                    >
+                      <Trash2 size={16} />
+                    </button>
                   </div>
                 </div>
               </div>
             ))}
           </div>
 
-          <div className="mt-4 p-3 bg-white rounded-lg border border-purple-200">
-            <div className="flex items-center justify-between text-sm">
-              <span className="font-medium text-gray-700">Selected Agents:</span>
-              <span className="font-bold text-purple-700">{agents.filter(a => a.enabled).length} of {agents.length}</span>
+          {/* Add/Edit Agent Form */}
+          {(showAddAgent || editingAgent) && (
+            <AgentForm
+              agent={editingAgent}
+              onSave={editingAgent ? (data: Partial<Agent>) => updateAgent(editingAgent.id, data) : addAgent}
+              onCancel={() => {
+                setShowAddAgent(false);
+                setEditingAgent(null);
+              }}
+            />
+          )}
+
+          {/* Portfolio Overview */}
+          <div className="mt-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-lg p-4">
+            <h4 className="text-md font-semibold mb-3 text-blue-900">📊 Portfolio Overview</h4>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="bg-white rounded-lg p-3 shadow-sm">
+                <div className="text-sm text-gray-600 mb-1">Enabled Agents</div>
+                <div className="text-2xl font-bold text-blue-900">{agents.filter(a => a.enabled).length} of {agents.length}</div>
+                <div className="text-xs text-gray-500 mt-1">
+                  Avg: {agents.filter(a => a.enabled).length > 0 ? (agents.filter(a => a.enabled).reduce((s, a) => s + calculateAgentCredits(a), 0) / agents.filter(a => a.enabled).length).toFixed(1) : 0} credits/conv
+                </div>
+              </div>
+              <div className="bg-white rounded-lg p-3 shadow-sm">
+                <div className="text-sm text-gray-600 mb-1">Complexity Range</div>
+                <div className="text-2xl font-bold text-blue-900">
+                  {agents.filter(a => a.enabled).length > 0 ? Math.min(...agents.filter(a => a.enabled).map(a => calculateAgentCredits(a))).toFixed(1) : 0} - {agents.filter(a => a.enabled).length > 0 ? Math.max(...agents.filter(a => a.enabled).map(a => calculateAgentCredits(a))).toFixed(1) : 0}
+                </div>
+                <div className="text-xs text-gray-500 mt-1">Credits per conversation range</div>
+              </div>
+              <div className="bg-white rounded-lg p-3 shadow-sm">
+                <div className="text-sm text-gray-600 mb-1">Using Tenant Graph</div>
+                <div className="text-2xl font-bold text-blue-900">
+                  {agents.filter(a => a.enabled && a.tenantGraph).length} / {agents.filter(a => a.enabled).length}
+                </div>
+                <div className="text-xs text-gray-500 mt-1">+10 credits/conversation each</div>
+              </div>
             </div>
           </div>
         </div>
@@ -903,141 +973,6 @@ const CopilotCostCalculator: React.FC = () => {
                   />
                 </div>
               </div>
-            </div>
-          )}
-        </div>
-
-        {/* Agents Configuration */}
-        <div className="bg-gray-50 rounded-lg p-5 border border-gray-200">
-          <button
-            onClick={() => setShowAgentPortfolio(!showAgentPortfolio)}
-            className="text-lg font-semibold text-gray-800 mb-4 hover:text-blue-600 transition-colors flex items-center gap-2"
-          >
-            {showAgentPortfolio ? '▼' : '▶'} Agents Configuration
-          </button>
-
-          {showAgentPortfolio && (
-            <div className="space-y-6">
-              {/* Agent Portfolio Management */}
-              <div className="bg-white rounded-lg p-4 border border-gray-300">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-md font-semibold text-gray-800">Agent Portfolio ({agents.length} agents)</h3>
-                  <button
-                    onClick={() => setShowAddAgent(true)}
-                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                  >
-                    <Plus size={18} />
-                    Add Agent
-                  </button>
-                </div>
-
-                {/* Agent List */}
-                <div className="space-y-3">
-                  {agents.map(agent => (
-                    <div key={agent.id} className="border rounded-lg p-4 bg-gray-50 hover:bg-gray-100 transition-colors">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-3 mb-2">
-                            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: agent.color }}></div>
-                            <h4 className="font-semibold text-gray-900">{agent.name}</h4>
-                            <span className="text-xs px-2 py-1 bg-gray-100 text-gray-600 rounded">
-                              Month {agent.deployMonth}+
-                            </span>
-                          </div>
-                          <p className="text-sm text-gray-600 mb-3">{agent.purpose}</p>
-
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
-                            <div>
-                              <span className="text-gray-500">Conversations/day:</span>
-                              <span className="ml-1 font-medium">{agent.conversationsPerDay}</span>
-                            </div>
-                            <div>
-                              <span className="text-gray-500">Turns:</span>
-                              <span className="ml-1 font-medium">{agent.turns}</span>
-                            </div>
-                            <div>
-                              <span className="text-gray-500">Generative:</span>
-                              <span className="ml-1 font-medium">{(agent.generativeRatio * 100).toFixed(0)}%</span>
-                            </div>
-                            <div>
-                              <span className="text-gray-500">Actions:</span>
-                              <span className="ml-1 font-medium">{agent.actions}</span>
-                            </div>
-                            <div>
-                              <span className="text-gray-500">Tenant Graph:</span>
-                              <span className="ml-1 font-medium">{agent.tenantGraph ? 'Yes' : 'No'}</span>
-                            </div>
-                            <div>
-                              <span className="text-gray-500">Credits/Conv:</span>
-                              <span className="ml-1 font-medium text-blue-600">{calculateAgentCredits(agent).toFixed(1)}</span>
-                            </div>
-                            <div className="col-span-2">
-                              <span className="text-gray-500">Segments:</span>
-                              <span className="ml-1 font-medium">{agent.segments.join(', ')}</span>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="flex gap-2 ml-4">
-                          <button
-                            onClick={() => setEditingAgent(agent)}
-                            className="p-2 text-gray-600 hover:bg-gray-100 rounded transition-colors"
-                          >
-                            <Edit2 size={16} />
-                          </button>
-                          <button
-                            onClick={() => deleteAgent(agent.id)}
-                            className="p-2 text-red-600 hover:bg-red-50 rounded transition-colors"
-                          >
-                            <Trash2 size={16} />
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Add/Edit Agent Form */}
-                {(showAddAgent || editingAgent) && (
-                  <AgentForm
-                    agent={editingAgent}
-                    onSave={editingAgent ? (data: Partial<Agent>) => updateAgent(editingAgent.id, data) : addAgent}
-                    onCancel={() => {
-                      setShowAddAgent(false);
-                      setEditingAgent(null);
-                    }}
-                  />
-                )}
-              </div>
-
-              {/* Portfolio Impact Summary */}
-              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-lg p-5">
-                <h3 className="text-lg font-semibold mb-3 text-blue-900">📊 Agent Portfolio Overview</h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="bg-white rounded-lg p-4 shadow-sm">
-                    <div className="text-sm text-gray-600 mb-1">Enabled Agents</div>
-                    <div className="text-2xl font-bold text-blue-900">{agents.filter(a => a.enabled).length} of {agents.length}</div>
-                    <div className="text-xs text-gray-500 mt-1">
-                      Avg: {agents.filter(a => a.enabled).length > 0 ? (agents.filter(a => a.enabled).reduce((s, a) => s + calculateAgentCredits(a), 0) / agents.filter(a => a.enabled).length).toFixed(1) : 0} credits/conv
-                    </div>
-                  </div>
-                  <div className="bg-white rounded-lg p-4 shadow-sm">
-                    <div className="text-sm text-gray-600 mb-1">Complexity Range</div>
-                    <div className="text-2xl font-bold text-blue-900">
-                      {agents.filter(a => a.enabled).length > 0 ? Math.min(...agents.filter(a => a.enabled).map(a => calculateAgentCredits(a))).toFixed(1) : 0} - {agents.filter(a => a.enabled).length > 0 ? Math.max(...agents.filter(a => a.enabled).map(a => calculateAgentCredits(a))).toFixed(1) : 0}
-                    </div>
-                    <div className="text-xs text-gray-500 mt-1">Credits per conversation range</div>
-                  </div>
-                  <div className="bg-white rounded-lg p-4 shadow-sm">
-                    <div className="text-sm text-gray-600 mb-1">Using Tenant Graph</div>
-                    <div className="text-2xl font-bold text-blue-900">
-                      {agents.filter(a => a.enabled && a.tenantGraph).length} / {agents.filter(a => a.enabled).length}
-                    </div>
-                    <div className="text-xs text-gray-500 mt-1">+10 credits/conversation each</div>
-                  </div>
-                </div>
-              </div>
-
             </div>
           )}
         </div>
