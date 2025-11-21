@@ -698,34 +698,6 @@ const CopilotCostCalculator: React.FC = () => {
               }}
             />
           )}
-
-          {/* Portfolio Overview */}
-          <div className="mt-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-lg p-4">
-            <h4 className="text-md font-semibold mb-3 text-blue-900">📊 Portfolio Overview</h4>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="bg-white rounded-lg p-3 shadow-sm">
-                <div className="text-sm text-gray-600 mb-1">Enabled Agents</div>
-                <div className="text-2xl font-bold text-blue-900">{agents.filter(a => a.enabled).length} of {agents.length}</div>
-                <div className="text-xs text-gray-500 mt-1">
-                  Avg: {agents.filter(a => a.enabled).length > 0 ? (agents.filter(a => a.enabled).reduce((s, a) => s + calculateAgentCredits(a), 0) / agents.filter(a => a.enabled).length).toFixed(1) : 0} credits/conv
-                </div>
-              </div>
-              <div className="bg-white rounded-lg p-3 shadow-sm">
-                <div className="text-sm text-gray-600 mb-1">Complexity Range</div>
-                <div className="text-2xl font-bold text-blue-900">
-                  {agents.filter(a => a.enabled).length > 0 ? Math.min(...agents.filter(a => a.enabled).map(a => calculateAgentCredits(a))).toFixed(1) : 0} - {agents.filter(a => a.enabled).length > 0 ? Math.max(...agents.filter(a => a.enabled).map(a => calculateAgentCredits(a))).toFixed(1) : 0}
-                </div>
-                <div className="text-xs text-gray-500 mt-1">Credits per conversation range</div>
-              </div>
-              <div className="bg-white rounded-lg p-3 shadow-sm">
-                <div className="text-sm text-gray-600 mb-1">Using Tenant Graph</div>
-                <div className="text-2xl font-bold text-blue-900">
-                  {agents.filter(a => a.enabled && a.tenantGraph).length} / {agents.filter(a => a.enabled).length}
-                </div>
-                <div className="text-xs text-gray-500 mt-1">+10 credits/conversation each</div>
-              </div>
-            </div>
-          </div>
         </div>
 
         {/* User Rollout Configuration */}
@@ -980,6 +952,70 @@ const CopilotCostCalculator: React.FC = () => {
             </div>
           )}
         </div>
+
+      {/* Configuration Summary */}
+      <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
+        <h2 className="text-xl font-bold text-gray-900 mb-4">
+          📋 Configuration Summary
+        </h2>
+        <p className="text-sm text-gray-600 mb-6">
+          Overview of your configured agent portfolio and user rollout plan
+        </p>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Agent Portfolio Overview */}
+          <div className="bg-gradient-to-r from-purple-50 to-blue-50 border-2 border-purple-200 rounded-lg p-5">
+            <h3 className="text-lg font-semibold mb-3 text-purple-900">🤖 Agent Portfolio Overview</h3>
+            <div className="space-y-3">
+              <div className="bg-white rounded-lg p-3 shadow-sm">
+                <div className="text-sm text-gray-600 mb-1">Enabled Agents</div>
+                <div className="text-2xl font-bold text-purple-900">{agents.filter(a => a.enabled).length} of {agents.length}</div>
+                <div className="text-xs text-gray-500 mt-1">
+                  Avg: {agents.filter(a => a.enabled).length > 0 ? (agents.filter(a => a.enabled).reduce((s, a) => s + calculateAgentCredits(a), 0) / agents.filter(a => a.enabled).length).toFixed(1) : 0} credits/conv
+                </div>
+              </div>
+              <div className="bg-white rounded-lg p-3 shadow-sm">
+                <div className="text-sm text-gray-600 mb-1">Complexity Range</div>
+                <div className="text-2xl font-bold text-purple-900">
+                  {agents.filter(a => a.enabled).length > 0 ? Math.min(...agents.filter(a => a.enabled).map(a => calculateAgentCredits(a))).toFixed(1) : 0} - {agents.filter(a => a.enabled).length > 0 ? Math.max(...agents.filter(a => a.enabled).map(a => calculateAgentCredits(a))).toFixed(1) : 0}
+                </div>
+                <div className="text-xs text-gray-500 mt-1">Credits per conversation</div>
+              </div>
+              <div className="bg-white rounded-lg p-3 shadow-sm">
+                <div className="text-sm text-gray-600 mb-1">Using Tenant Graph</div>
+                <div className="text-2xl font-bold text-purple-900">
+                  {agents.filter(a => a.enabled && a.tenantGraph).length} / {agents.filter(a => a.enabled).length}
+                </div>
+                <div className="text-xs text-gray-500 mt-1">+10 credits/conversation each</div>
+              </div>
+            </div>
+          </div>
+
+          {/* User Onboarding Overview */}
+          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-lg p-5">
+            <h3 className="text-lg font-semibold mb-3 text-blue-900">👥 User Onboarding Overview</h3>
+            <div className="space-y-3">
+              <div className="bg-white rounded-lg p-3 shadow-sm">
+                <div className="text-sm text-gray-600 mb-1">Total Users (Final)</div>
+                <div className="text-2xl font-bold text-blue-900">{formatNumber(stages[stages.length - 1].users)}</div>
+                <div className="text-xs text-gray-500 mt-1">At month {stages[stages.length - 1].month}</div>
+              </div>
+              <div className="bg-white rounded-lg p-3 shadow-sm">
+                <div className="text-sm text-gray-600 mb-1">Rollout Duration</div>
+                <div className="text-2xl font-bold text-blue-900">{stages[stages.length - 1].month} months</div>
+                <div className="text-xs text-gray-500 mt-1">{stages.length} deployment stages</div>
+              </div>
+              <div className="bg-white rounded-lg p-3 shadow-sm">
+                <div className="text-sm text-gray-600 mb-1">DAU Range</div>
+                <div className="text-2xl font-bold text-blue-900">
+                  {(Math.min(...stages.map(s => s.dau)) * 100).toFixed(0)}% - {(Math.max(...stages.map(s => s.dau)) * 100).toFixed(0)}%
+                </div>
+                <div className="text-xs text-gray-500 mt-1">Daily active user rate</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
 
       {/* Portfolio Metrics and Licensing Recommendation */}
       <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
