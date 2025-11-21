@@ -535,9 +535,9 @@ const CopilotCostCalculator: React.FC = () => {
         return { creditsPerUser: 0, costPerUser: 0 };
       }
 
-      // Calculate the actual number of active users using the enabled agents
-      // by summing up active users per agent (since each agent tracks its own eligible users)
-      let totalAgentActiveUsers = 0;
+      // Calculate the number of UNIQUE active users who have access to at least one enabled agent
+      // We take the maximum eligible users across all agents (broadest access)
+      let maxEligibleUsers = 0;
 
       agents.forEach(agent => {
         if (!agent.enabled) return;
@@ -565,23 +565,24 @@ const CopilotCostCalculator: React.FC = () => {
           }
         }
 
-        const activeUsers = Math.round(eligibleUsers * monthUserData.dau);
-        totalAgentActiveUsers += activeUsers;
+        // Track the maximum eligible users (broadest agent access)
+        maxEligibleUsers = Math.max(maxEligibleUsers, eligibleUsers);
       });
 
       // If no agents or no users, return 0
-      if (totalAgentActiveUsers === 0) {
+      if (maxEligibleUsers === 0) {
         return { creditsPerUser: 0, costPerUser: 0 };
       }
+
+      // Active users = eligible users who have access to at least one agent × DAU rate
+      const uniqueActiveUsers = Math.round(maxEligibleUsers * monthUserData.dau);
 
       // Total credits = total cost / $0.01
       const totalCredits = monthCostData.totalCost / 0.01;
 
-      // Credits per user = total credits / sum of active users across all agents
-      // Note: This counts users multiple times if they use multiple agents, which is correct
-      // because each user-agent interaction consumes credits
-      const creditsPerUser = totalCredits / totalAgentActiveUsers;
-      const costPerUser = monthCostData.totalCost / totalAgentActiveUsers;
+      // Credits per unique active user = total credits / unique active users
+      const creditsPerUser = totalCredits / uniqueActiveUsers;
+      const costPerUser = monthCostData.totalCost / uniqueActiveUsers;
 
       return {
         creditsPerUser: Math.round(creditsPerUser),
