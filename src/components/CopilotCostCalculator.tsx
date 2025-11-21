@@ -1640,6 +1640,7 @@ const CopilotCostCalculator: React.FC = () => {
           </div>
         </div>
       </div>
+      </div>
 
     </div>
   );
