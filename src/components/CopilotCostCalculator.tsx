@@ -535,10 +535,53 @@ const CopilotCostCalculator: React.FC = () => {
         return { creditsPerUser: 0, costPerUser: 0 };
       }
 
+      // Calculate the actual number of active users using the enabled agents
+      // by summing up active users per agent (since each agent tracks its own eligible users)
+      let totalAgentActiveUsers = 0;
+
+      agents.forEach(agent => {
+        if (!agent.enabled) return;
+        if (month < agent.deployMonth) return;
+
+        // Determine eligible users based on segments (same logic as agentMonthlyCosts)
+        let eligibleUsers = 0;
+        const currentStage = [...stages].reverse().find(s => s.month <= month) || stages[0];
+
+        if (agent.segments.includes('All')) {
+          eligibleUsers = monthUserData.users;
+        } else if (agent.segments.includes('Stores')) {
+          eligibleUsers = monthUserData.users;
+        } else if (agent.segments.includes('Management')) {
+          if (currentStage.phase === 'Management' || currentStage.phase === 'Stores' || currentStage.phase === 'Enterprise') {
+            eligibleUsers = monthUserData.users;
+          } else if (currentStage.phase === 'Expansion') {
+            eligibleUsers = Math.round(monthUserData.users * 0.4);
+          }
+        } else if (agent.segments.includes('HQ')) {
+          if (currentStage.phase === 'Pilot' || currentStage.phase === 'Expansion') {
+            eligibleUsers = monthUserData.users;
+          } else {
+            eligibleUsers = Math.round(monthUserData.users * 0.15);
+          }
+        }
+
+        const activeUsers = Math.round(eligibleUsers * monthUserData.dau);
+        totalAgentActiveUsers += activeUsers;
+      });
+
+      // If no agents or no users, return 0
+      if (totalAgentActiveUsers === 0) {
+        return { creditsPerUser: 0, costPerUser: 0 };
+      }
+
       // Total credits = total cost / $0.01
       const totalCredits = monthCostData.totalCost / 0.01;
-      const creditsPerUser = totalCredits / monthUserData.activeUsers;
-      const costPerUser = monthCostData.totalCost / monthUserData.activeUsers;
+
+      // Credits per user = total credits / sum of active users across all agents
+      // Note: This counts users multiple times if they use multiple agents, which is correct
+      // because each user-agent interaction consumes credits
+      const creditsPerUser = totalCredits / totalAgentActiveUsers;
+      const costPerUser = monthCostData.totalCost / totalAgentActiveUsers;
 
       return {
         creditsPerUser: Math.round(creditsPerUser),
@@ -562,7 +605,7 @@ const CopilotCostCalculator: React.FC = () => {
       month24,
       month36
     };
-  }, [agents, agentMonthlyCosts, monthlyData]);
+  }, [agents, agentMonthlyCosts, monthlyData, stages]);
 
   // Helper functions
   const formatCurrency = (value: number): string => `$${value.toLocaleString()}`;
