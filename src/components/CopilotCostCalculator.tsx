@@ -95,7 +95,6 @@ const CopilotCostCalculator: React.FC = () => {
   const [showAdvanced, setShowAdvanced] = useState<boolean>(false);
   const [showStageEditor, setShowStageEditor] = useState<boolean>(false);
   const [showRolloutPlan, setShowRolloutPlan] = useState<boolean>(false);
-  const [showAgentPortfolio, setShowAgentPortfolio] = useState<boolean>(false);
   const [showSettings, setShowSettings] = useState<boolean>(true);
 
   // Agent portfolio state
@@ -1292,7 +1291,7 @@ const CopilotCostCalculator: React.FC = () => {
       )}
 
       {/* Agent Cost Analysis (3-Year Total) */}
-      {showAgentPortfolio && agents.filter(a => a.enabled).length > 0 && (
+      {agents.filter(a => a.enabled).length > 0 && (
         <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
           <h2 className="text-xl font-bold text-gray-900 mb-4">
             Agent Cost Analysis (3-Year Total)
@@ -1614,7 +1613,7 @@ const CopilotCostCalculator: React.FC = () => {
       </div>
 
       {/* Cost Breakdown by Agent (Monthly, PAYG Pricing) */}
-      {showAgentPortfolio && agents.filter(a => a.enabled).length > 0 && (
+      {agents.filter(a => a.enabled).length > 0 && (
         <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
           <h2 className="text-xl font-bold text-gray-900 mb-4">
             Cost Breakdown by Agent (Monthly, PAYG Pricing)
