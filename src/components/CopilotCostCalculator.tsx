@@ -522,91 +522,141 @@ const CopilotCostCalculator: React.FC = () => {
     return summary;
   }, [agents, agentMonthlyCosts]);
 
-  // Calculate licensing impact based on agent portfolio
-  const licensingImpact = useMemo(() => {
-    const BREAKEVEN_CREDITS = 3000;
+  // Calculate licensing breakpoint analysis
+  const licensingBreakpoint = useMemo(() => {
+    const enabledAgents = agents.filter(a => a.enabled);
 
-    // Calculate metrics for Month 12, 24, and 36 to show evolution
-    const calculateMonthMetrics = (month: number) => {
-      const monthCostData = agentMonthlyCosts[month - 1];
-      const monthUserData = monthlyData[month - 1];
+    if (enabledAgents.length === 0) {
+      return {
+        currentAgentCount: 0,
+        currentPaygTotal: 0,
+        currentM365Total: 0,
+        breakpointAgentCount: 0,
+        breakpointPaygTotal: 0,
+        additionalAgents: 0,
+        hasBreakpoint: false,
+        message: 'No agents enabled'
+      };
+    }
 
-      if (!monthCostData || !monthUserData || monthUserData.activeUsers === 0) {
-        return { creditsPerUser: 0, costPerUser: 0 };
-      }
+    // Get current costs from pricing summary
+    const currentPaygTotal = pricingSummary.find(p => p.model === 'PAYG Alone')?.total || 0;
+    const currentM365Total = pricingSummary.find(p => p.model === 'M365 Copilot for All')?.total || 0;
+    const currentM365HybridTotal = pricingSummary.find(p => p.model === 'PAYG + M365 Licenses')?.total || 0;
 
-      // Calculate the number of UNIQUE active users who have access to at least one enabled agent
-      // We take the maximum eligible users across all agents (broadest access)
-      let maxEligibleUsers = 0;
+    // Find the cheapest M365 option
+    const cheapestM365Total = Math.min(currentM365Total, currentM365HybridTotal);
+    const cheapestM365Model = currentM365Total < currentM365HybridTotal ? 'M365 Copilot for All' : 'PAYG + M365 Licenses';
 
-      agents.forEach(agent => {
-        if (!agent.enabled) return;
-        if (month < agent.deployMonth) return;
+    // If M365 is already cheaper, return current state
+    if (currentPaygTotal >= cheapestM365Total) {
+      return {
+        currentAgentCount: enabledAgents.length,
+        currentPaygTotal,
+        currentM365Total: cheapestM365Total,
+        currentM365Model: cheapestM365Model,
+        breakpointAgentCount: enabledAgents.length,
+        breakpointPaygTotal: currentPaygTotal,
+        additionalAgents: 0,
+        hasBreakpoint: true,
+        message: `M365 licensing (${cheapestM365Model}) is already more economical at current scale`
+      };
+    }
 
-        // Determine eligible users based on segments (same logic as agentMonthlyCosts)
+    // Calculate average agent characteristics for simulation
+    const avgCreditsPerConv = enabledAgents.reduce((sum, a) => sum + calculateAgentCredits(a), 0) / enabledAgents.length;
+    const avgConversationsPerDay = enabledAgents.reduce((sum, a) => sum + a.conversationsPerDay, 0) / enabledAgents.length;
+    const avgDeployMonth = Math.round(enabledAgents.reduce((sum, a) => sum + a.deployMonth, 0) / enabledAgents.length);
+
+    // Most common segment (for simulation)
+    const segmentCounts = new Map<string, number>();
+    enabledAgents.forEach(a => {
+      a.segments.forEach(seg => {
+        segmentCounts.set(seg, (segmentCounts.get(seg) || 0) + 1);
+      });
+    });
+    const mostCommonSegment = Array.from(segmentCounts.entries()).sort((a, b) => b[1] - a[1])[0][0];
+
+    // Simulate adding agents incrementally
+    const PAYG_RATE = 0.01;
+    const DAYS_PER_MONTH = 30;
+    const MAX_AGENTS_TO_SIMULATE = 200; // Reasonable upper limit
+
+    for (let additionalAgents = 1; additionalAgents <= MAX_AGENTS_TO_SIMULATE; additionalAgents++) {
+      // Calculate additional cost from simulated agents
+      let additionalCost = 0;
+
+      for (let month = 1; month <= 36; month++) {
+        const monthData = monthlyData[month - 1];
+        if (!monthData) continue;
+
+        // Only count months after average deployment
+        if (month < avgDeployMonth) continue;
+
+        // Calculate eligible users based on most common segment
         let eligibleUsers = 0;
         const currentStage = [...stages].reverse().find(s => s.month <= month) || stages[0];
 
-        if (agent.segments.includes('All')) {
-          eligibleUsers = monthUserData.users;
-        } else if (agent.segments.includes('Stores')) {
-          eligibleUsers = monthUserData.users;
-        } else if (agent.segments.includes('Management')) {
+        if (mostCommonSegment === 'All') {
+          eligibleUsers = monthData.users;
+        } else if (mostCommonSegment === 'Stores') {
+          eligibleUsers = monthData.users;
+        } else if (mostCommonSegment === 'Management') {
           if (currentStage.phase === 'Management' || currentStage.phase === 'Stores' || currentStage.phase === 'Enterprise') {
-            eligibleUsers = monthUserData.users;
+            eligibleUsers = monthData.users;
           } else if (currentStage.phase === 'Expansion') {
-            eligibleUsers = Math.round(monthUserData.users * 0.4);
+            eligibleUsers = Math.round(monthData.users * 0.4);
           }
-        } else if (agent.segments.includes('HQ')) {
+        } else if (mostCommonSegment === 'HQ') {
           if (currentStage.phase === 'Pilot' || currentStage.phase === 'Expansion') {
-            eligibleUsers = monthUserData.users;
+            eligibleUsers = monthData.users;
           } else {
-            eligibleUsers = Math.round(monthUserData.users * 0.15);
+            eligibleUsers = Math.round(monthData.users * 0.15);
           }
         }
 
-        // Track the maximum eligible users (broadest agent access)
-        maxEligibleUsers = Math.max(maxEligibleUsers, eligibleUsers);
-      });
+        // Calculate cost for simulated agents this month
+        const activeUsers = Math.round(eligibleUsers * monthData.dau);
+        const monthlyConversations = activeUsers * avgConversationsPerDay * DAYS_PER_MONTH;
+        const monthlyCredits = monthlyConversations * avgCreditsPerConv;
+        const monthlyCost = monthlyCredits * PAYG_RATE;
 
-      // If no agents or no users, return 0
-      if (maxEligibleUsers === 0) {
-        return { creditsPerUser: 0, costPerUser: 0 };
+        additionalCost += monthlyCost * additionalAgents;
       }
 
-      // Active users = eligible users who have access to at least one agent × DAU rate
-      const uniqueActiveUsers = Math.round(maxEligibleUsers * monthUserData.dau);
+      const projectedPaygTotal = currentPaygTotal + additionalCost;
 
-      // Total credits = total cost / $0.01
-      const totalCredits = monthCostData.totalCost / 0.01;
+      // Check if we've reached the breakpoint
+      if (projectedPaygTotal >= cheapestM365Total) {
+        return {
+          currentAgentCount: enabledAgents.length,
+          currentPaygTotal,
+          currentM365Total: cheapestM365Total,
+          currentM365Model: cheapestM365Model,
+          breakpointAgentCount: enabledAgents.length + additionalAgents,
+          breakpointPaygTotal: Math.round(projectedPaygTotal),
+          additionalAgents,
+          hasBreakpoint: true,
+          avgCreditsPerConv: Math.round(avgCreditsPerConv * 10) / 10,
+          message: `With your current onboarding plan, you have headroom for ${additionalAgents} more agent${additionalAgents > 1 ? 's' : ''} before M365 licensing becomes more economical`
+        };
+      }
+    }
 
-      // Credits per unique active user = total credits / unique active users
-      const creditsPerUser = totalCredits / uniqueActiveUsers;
-      const costPerUser = monthCostData.totalCost / uniqueActiveUsers;
-
-      return {
-        creditsPerUser: Math.round(creditsPerUser),
-        costPerUser: Math.round(costPerUser * 100) / 100
-      };
-    };
-
-    const month12 = calculateMonthMetrics(12);
-    const month24 = calculateMonthMetrics(24);
-    const month36 = calculateMonthMetrics(36);
-
-    // Use Month 24 (Year 2 end) as primary metric - all agents deployed, significant user base
-    const avgCreditsPerUserMonth = month24.creditsPerUser;
-    const monthlyCostPerUser = month24.costPerUser;
-
+    // No breakpoint found within reasonable limits
     return {
-      avgCreditsPerUserMonth,
-      monthlyCostPerUser,
-      recommendM365: avgCreditsPerUserMonth > BREAKEVEN_CREDITS,
-      month12,
-      month24,
-      month36
+      currentAgentCount: enabledAgents.length,
+      currentPaygTotal,
+      currentM365Total: cheapestM365Total,
+      currentM365Model: cheapestM365Model,
+      breakpointAgentCount: enabledAgents.length + MAX_AGENTS_TO_SIMULATE,
+      breakpointPaygTotal: 0,
+      additionalAgents: MAX_AGENTS_TO_SIMULATE,
+      hasBreakpoint: false,
+      avgCreditsPerConv: Math.round(avgCreditsPerConv * 10) / 10,
+      message: `PAYG remains more economical even with ${MAX_AGENTS_TO_SIMULATE}+ additional agents given your onboarding plan`
     };
-  }, [agents, agentMonthlyCosts, monthlyData, stages]);
+  }, [agents, pricingSummary, monthlyData, stages]);
 
   // Helper functions
   const formatCurrency = (value: number): string => `$${value.toLocaleString()}`;
@@ -1061,63 +1111,6 @@ const CopilotCostCalculator: React.FC = () => {
         </div>
       </div>
 
-      {/* Portfolio Metrics and Licensing Recommendation */}
-      <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
-        <h2 className="text-xl font-bold text-gray-900 mb-4">
-          Portfolio Metrics & Licensing Recommendation
-        </h2>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Key Metrics */}
-          <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg p-5 border-2 border-blue-200">
-            <h3 className="font-semibold text-blue-900 mb-3">📊 Portfolio Metrics (Month 24)</h3>
-            <div className="space-y-3">
-              <div className="bg-white rounded p-3">
-                <div className="text-sm text-gray-600">Avg Credits/User/Month</div>
-                <div className="text-2xl font-bold text-blue-900">{formatNumber(licensingImpact.avgCreditsPerUserMonth)}</div>
-                <div className="text-xs text-gray-500 mt-1">Based on actual deployment and user counts</div>
-              </div>
-              <div className="bg-white rounded p-3">
-                <div className="text-sm text-gray-600">Monthly Cost/User (PAYG)</div>
-                <div className="text-2xl font-bold text-blue-900">${licensingImpact.monthlyCostPerUser?.toFixed(2) || '0.00'}</div>
-                <div className="text-xs text-gray-500 mt-1">At $0.01 per credit</div>
-              </div>
-            </div>
-          </div>
-
-          {/* Breakeven Analysis */}
-          <div className={`rounded-lg p-5 border-2 ${
-            licensingImpact.recommendM365
-              ? 'bg-gradient-to-br from-green-50 to-emerald-50 border-green-300'
-              : 'bg-gradient-to-br from-yellow-50 to-orange-50 border-yellow-300'
-          }`}>
-            <h3 className={`font-semibold mb-3 ${
-              licensingImpact.recommendM365 ? 'text-green-900' : 'text-yellow-900'
-            }`}>
-              💡 Licensing Recommendation
-            </h3>
-            <div className="space-y-3">
-              <div className="bg-white rounded p-3">
-                <div className="text-sm text-gray-600">Breakeven Threshold</div>
-                <div className="text-2xl font-bold text-gray-900">3,000 credits/month</div>
-                <div className="text-xs text-gray-500 mt-1">M365 Copilot = $30/user/month</div>
-              </div>
-              <div className="bg-white rounded p-3">
-                <div className="text-sm font-semibold mb-2">
-                  {licensingImpact.recommendM365 ? '✅ Recommendation: M365 Copilot' : '✅ Recommendation: PAYG'}
-                </div>
-                <p className="text-xs text-gray-700">
-                  {licensingImpact.recommendM365
-                    ? `Your portfolio averages ${formatNumber(licensingImpact.avgCreditsPerUserMonth)} credits/user/month, which is above the 3,000 credit breakeven. M365 Copilot licenses are more cost-effective.`
-                    : `Your portfolio averages ${formatNumber(licensingImpact.avgCreditsPerUserMonth)} credits/user/month, which is below the 3,000 credit breakeven. Stay on PAYG for better value.`
-                  }
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
       {/* 3-Year Cost Summary Table */}
       <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
         <h2 className="text-xl font-bold text-gray-900 mb-4">
@@ -1176,6 +1169,134 @@ const CopilotCostCalculator: React.FC = () => {
           ))}
         </div>
       </div>
+
+      {/* Licensing Breakpoint Analysis */}
+      {agents.filter(a => a.enabled).length > 0 && (
+        <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
+          <h2 className="text-xl font-bold text-gray-900 mb-4">
+            💡 Licensing Breakpoint Analysis
+          </h2>
+          <p className="text-sm text-gray-600 mb-4">
+            Based on your specific onboarding plan and current agent portfolio, this analysis shows how many more agents you can add before M365 licensing becomes more economical than PAYG.
+          </p>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Current State */}
+            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-blue-300 rounded-lg p-5">
+              <h3 className="text-lg font-semibold text-blue-900 mb-3">📊 Current State</h3>
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-gray-700">Enabled Agents:</span>
+                  <span className="text-lg font-bold text-blue-900">{licensingBreakpoint.currentAgentCount}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-gray-700">PAYG 3-Year Total:</span>
+                  <span className="text-lg font-bold text-blue-900">{formatCurrency(licensingBreakpoint.currentPaygTotal)}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-gray-700">M365 3-Year Total:</span>
+                  <span className="text-lg font-bold text-indigo-900">{formatCurrency(licensingBreakpoint.currentM365Total)}</span>
+                </div>
+                <div className="pt-3 border-t border-blue-200">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm font-medium text-gray-700">PAYG Savings:</span>
+                    <span className="text-lg font-bold text-green-600">
+                      {licensingBreakpoint.currentPaygTotal < licensingBreakpoint.currentM365Total
+                        ? formatCurrency(licensingBreakpoint.currentM365Total - licensingBreakpoint.currentPaygTotal)
+                        : '$0'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Breakpoint Analysis */}
+            <div className={`bg-gradient-to-br ${
+              licensingBreakpoint.hasBreakpoint && licensingBreakpoint.additionalAgents > 0
+                ? 'from-green-50 to-emerald-50 border-2 border-green-300'
+                : licensingBreakpoint.hasBreakpoint && licensingBreakpoint.additionalAgents === 0
+                ? 'from-orange-50 to-amber-50 border-2 border-orange-300'
+                : 'from-purple-50 to-pink-50 border-2 border-purple-300'
+            } rounded-lg p-5`}>
+              <h3 className={`text-lg font-semibold mb-3 ${
+                licensingBreakpoint.hasBreakpoint && licensingBreakpoint.additionalAgents > 0
+                  ? 'text-green-900'
+                  : licensingBreakpoint.hasBreakpoint && licensingBreakpoint.additionalAgents === 0
+                  ? 'text-orange-900'
+                  : 'text-purple-900'
+              }`}>
+                {licensingBreakpoint.hasBreakpoint && licensingBreakpoint.additionalAgents > 0
+                  ? '✅ Breakpoint Found'
+                  : licensingBreakpoint.hasBreakpoint && licensingBreakpoint.additionalAgents === 0
+                  ? '⚠️ At Breakpoint'
+                  : '🚀 High Headroom'}
+              </h3>
+
+              {licensingBreakpoint.hasBreakpoint && licensingBreakpoint.additionalAgents > 0 ? (
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-700">Additional Agents:</span>
+                    <span className="text-2xl font-bold text-green-900">+{licensingBreakpoint.additionalAgents}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-700">Breakpoint @ Agents:</span>
+                    <span className="text-lg font-bold text-green-900">{licensingBreakpoint.breakpointAgentCount}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-700">PAYG @ Breakpoint:</span>
+                    <span className="text-lg font-bold text-gray-900">{formatCurrency(licensingBreakpoint.breakpointPaygTotal)}</span>
+                  </div>
+                  <div className="pt-3 border-t border-green-200">
+                    <p className="text-sm text-gray-700 italic">
+                      {licensingBreakpoint.avgCreditsPerConv && `Simulated with avg ${licensingBreakpoint.avgCreditsPerConv} credits/conv`}
+                    </p>
+                  </div>
+                </div>
+              ) : licensingBreakpoint.hasBreakpoint && licensingBreakpoint.additionalAgents === 0 ? (
+                <div className="space-y-3">
+                  <p className="text-sm text-gray-700">
+                    M365 licensing ({licensingBreakpoint.currentM365Model}) is already more economical at your current agent scale.
+                  </p>
+                  <div className="flex justify-between items-center pt-3 border-t border-orange-200">
+                    <span className="text-sm font-medium text-gray-700">Consider:</span>
+                    <span className="text-lg font-bold text-orange-900">{licensingBreakpoint.currentM365Model}</span>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <p className="text-sm text-gray-700">
+                    PAYG remains highly economical even with {licensingBreakpoint.additionalAgents}+ additional agents given your current onboarding plan and user adoption rates.
+                  </p>
+                  <div className="pt-3 border-t border-purple-200">
+                    <p className="text-xs text-gray-600 italic">
+                      Your phased rollout and DAU rates keep per-user costs low
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Key Insight */}
+          <div className={`mt-6 p-4 rounded-lg border-l-4 ${
+            licensingBreakpoint.hasBreakpoint && licensingBreakpoint.additionalAgents > 0
+              ? 'bg-green-50 border-green-500'
+              : licensingBreakpoint.hasBreakpoint && licensingBreakpoint.additionalAgents === 0
+              ? 'bg-orange-50 border-orange-500'
+              : 'bg-purple-50 border-purple-500'
+          }`}>
+            <p className={`text-sm font-medium ${
+              licensingBreakpoint.hasBreakpoint && licensingBreakpoint.additionalAgents > 0
+                ? 'text-green-900'
+                : licensingBreakpoint.hasBreakpoint && licensingBreakpoint.additionalAgents === 0
+                ? 'text-orange-900'
+                : 'text-purple-900'
+            }`}>
+              💡 {licensingBreakpoint.message}
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Agent Cost Analysis (3-Year Total) */}
       {showAgentPortfolio && agents.filter(a => a.enabled).length > 0 && (
