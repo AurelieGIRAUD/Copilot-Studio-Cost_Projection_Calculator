@@ -907,6 +907,10 @@ const CopilotCostCalculator: React.FC = () => {
           )}
         </div>
 
+            </div>
+          )}
+        </div>
+
         {/* Agents Configuration */}
         <div className="bg-gray-50 rounded-lg p-5 border border-gray-200">
           <button
@@ -1037,10 +1041,6 @@ const CopilotCostCalculator: React.FC = () => {
                   </div>
                 </div>
               </div>
-
-            </div>
-          )}
-        </div>
 
             </div>
           )}
