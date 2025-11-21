@@ -540,26 +540,21 @@ const CopilotCostCalculator: React.FC = () => {
     }
 
     // Get current costs from pricing summary
+    // Compare PAYG to pure M365 licensing (M365 Copilot for All), not hybrid models
     const currentPaygTotal = pricingSummary.find(p => p.model === 'PAYG Alone')?.total || 0;
     const currentM365Total = pricingSummary.find(p => p.model === 'M365 Copilot for All')?.total || 0;
-    const currentM365HybridTotal = pricingSummary.find(p => p.model === 'PAYG + M365 Licenses')?.total || 0;
-
-    // Find the cheapest M365 option
-    const cheapestM365Total = Math.min(currentM365Total, currentM365HybridTotal);
-    const cheapestM365Model = currentM365Total < currentM365HybridTotal ? 'M365 Copilot for All' : 'PAYG + M365 Licenses';
 
     // If M365 is already cheaper, return current state
-    if (currentPaygTotal >= cheapestM365Total) {
+    if (currentPaygTotal >= currentM365Total) {
       return {
         currentAgentCount: enabledAgents.length,
         currentPaygTotal,
-        currentM365Total: cheapestM365Total,
-        currentM365Model: cheapestM365Model,
+        currentM365Total,
         breakpointAgentCount: enabledAgents.length,
         breakpointPaygTotal: currentPaygTotal,
         additionalAgents: 0,
         hasBreakpoint: true,
-        message: `M365 licensing (${cheapestM365Model}) is already more economical at current scale`
+        message: `M365 Copilot for All is already more economical at current scale`
       };
     }
 
@@ -627,18 +622,17 @@ const CopilotCostCalculator: React.FC = () => {
       const projectedPaygTotal = currentPaygTotal + additionalCost;
 
       // Check if we've reached the breakpoint
-      if (projectedPaygTotal >= cheapestM365Total) {
+      if (projectedPaygTotal >= currentM365Total) {
         return {
           currentAgentCount: enabledAgents.length,
           currentPaygTotal,
-          currentM365Total: cheapestM365Total,
-          currentM365Model: cheapestM365Model,
+          currentM365Total,
           breakpointAgentCount: enabledAgents.length + additionalAgents,
           breakpointPaygTotal: Math.round(projectedPaygTotal),
           additionalAgents,
           hasBreakpoint: true,
           avgCreditsPerConv: Math.round(avgCreditsPerConv * 10) / 10,
-          message: `With your current onboarding plan, you have headroom for ${additionalAgents} more agent${additionalAgents > 1 ? 's' : ''} before M365 licensing becomes more economical`
+          message: `With your current onboarding plan, you have headroom for ${additionalAgents} more agent${additionalAgents > 1 ? 's' : ''} before M365 Copilot for All becomes more economical`
         };
       }
     }
@@ -647,8 +641,7 @@ const CopilotCostCalculator: React.FC = () => {
     return {
       currentAgentCount: enabledAgents.length,
       currentPaygTotal,
-      currentM365Total: cheapestM365Total,
-      currentM365Model: cheapestM365Model,
+      currentM365Total,
       breakpointAgentCount: enabledAgents.length + MAX_AGENTS_TO_SIMULATE,
       breakpointPaygTotal: 0,
       additionalAgents: MAX_AGENTS_TO_SIMULATE,
@@ -1194,7 +1187,7 @@ const CopilotCostCalculator: React.FC = () => {
                   <span className="text-lg font-bold text-blue-900">{formatCurrency(licensingBreakpoint.currentPaygTotal)}</span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-700">M365 3-Year Total:</span>
+                  <span className="text-sm text-gray-700">M365 Copilot for All Total:</span>
                   <span className="text-lg font-bold text-indigo-900">{formatCurrency(licensingBreakpoint.currentM365Total)}</span>
                 </div>
                 <div className="pt-3 border-t border-blue-200">
@@ -1255,11 +1248,11 @@ const CopilotCostCalculator: React.FC = () => {
               ) : licensingBreakpoint.hasBreakpoint && licensingBreakpoint.additionalAgents === 0 ? (
                 <div className="space-y-3">
                   <p className="text-sm text-gray-700">
-                    M365 licensing ({licensingBreakpoint.currentM365Model}) is already more economical at your current agent scale.
+                    M365 Copilot for All is already more economical at your current agent scale.
                   </p>
                   <div className="flex justify-between items-center pt-3 border-t border-orange-200">
                     <span className="text-sm font-medium text-gray-700">Consider:</span>
-                    <span className="text-lg font-bold text-orange-900">{licensingBreakpoint.currentM365Model}</span>
+                    <span className="text-lg font-bold text-orange-900">M365 Copilot for All</span>
                   </div>
                 </div>
               ) : (
