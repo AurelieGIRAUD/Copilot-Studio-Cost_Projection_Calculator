@@ -227,7 +227,7 @@ const CopilotCostCalculator: React.FC = () => {
   // Calculate monthly projections over 36 months (aggregated from all agents)
   const monthlyData = useMemo((): MonthlyData[] => {
     const data: MonthlyData[] = [];
-    const DAYS_PER_MONTH = 30;
+    const WORKING_DAYS_PER_MONTH = 22;
     const paygRate = 0.01;
     const p3Discount = 0.15;
 
@@ -277,7 +277,7 @@ const CopilotCostCalculator: React.FC = () => {
 
         // Calculate agent-specific metrics
         const agentActiveUsers = Math.round(eligibleUsers * dau);
-        const agentConversations = agentActiveUsers * agent.conversationsPerDay * DAYS_PER_MONTH;
+        const agentConversations = agentActiveUsers * agent.conversationsPerDay * WORKING_DAYS_PER_MONTH;
         const agentCreditsPerConv = calculateAgentCredits(agent);
         const agentCredits = agentConversations * agentCreditsPerConv;
 
@@ -391,7 +391,7 @@ const CopilotCostCalculator: React.FC = () => {
   const agentMonthlyCosts = useMemo((): AgentMonthlyCost[] => {
     const costs: AgentMonthlyCost[] = [];
     const PAYG_RATE = 0.01;
-    const DAYS_PER_MONTH = 30;
+    const WORKING_DAYS_PER_MONTH = 22;
 
     for (let month = 1; month <= 36; month++) {
       // Find current user counts from monthlyData
@@ -441,7 +441,7 @@ const CopilotCostCalculator: React.FC = () => {
         // Calculate costs for this agent
         const activeUsers = Math.round(eligibleUsers * monthData.dau);
         const creditsPerConv = calculateAgentCredits(agent);
-        const monthlyConversations = activeUsers * agent.conversationsPerDay * DAYS_PER_MONTH;
+        const monthlyConversations = activeUsers * agent.conversationsPerDay * WORKING_DAYS_PER_MONTH;
         const monthlyCredits = monthlyConversations * creditsPerConv;
         const monthlyCost = monthlyCredits * PAYG_RATE;
 
