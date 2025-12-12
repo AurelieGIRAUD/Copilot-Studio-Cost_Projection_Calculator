@@ -12,11 +12,6 @@ interface Stage {
 }
 
 interface Config {
-  conversationsPerDay: number;
-  turnsPerConversation: number;
-  generativeRatio: number;
-  actionsPerConversation: number;
-  peakMultiplier: number;
   m365CopilotPrice: number;
   autonomousActionRatio: number;
   hybridM365Users: number;
@@ -82,11 +77,6 @@ const CopilotCostCalculator: React.FC = () => {
 
   // Configuration parameters with sliders
   const [config, setConfig] = useState<Config>({
-    conversationsPerDay: 4,
-    turnsPerConversation: 5,
-    generativeRatio: 0.70,
-    actionsPerConversation: 1.5,
-    peakMultiplier: 1.4,
     m365CopilotPrice: 30,
     autonomousActionRatio: 0.15,
     hybridM365Users: 200
@@ -217,56 +207,6 @@ const CopilotCostCalculator: React.FC = () => {
     setAgents(agents.map(a => a.id === id ? { ...a, enabled: !a.enabled } : a));
   };
 
-  // Parameter ranges with market research guidance
-  const parameterRanges = {
-    conversationsPerDay: {
-      min: 1, max: 12, default: 4, step: 1,
-      low: "1-2 (Store workers, simple lookups)",
-      medium: "3-5 (Office workers, moderate usage)",
-      high: "6-12 (Power users, heavy daily usage)"
-    },
-    turnsPerConversation: {
-      min: 2, max: 10, default: 5, step: 1,
-      low: "2-3 (Quick queries)",
-      medium: "4-6 (Standard interactions)",
-      high: "7-10 (Complex problem-solving)"
-    },
-    generativeRatio: {
-      min: 0, max: 100, default: 70, step: 5,
-      low: "20-40% (Mostly classic responses)",
-      medium: "50-70% (Balanced approach)",
-      high: "80-100% (AI-first strategy)"
-    },
-    actionsPerConversation: {
-      min: 0, max: 5, default: 1.5, step: 0.5,
-      low: "0-1 (Information only)",
-      medium: "1-2 (Some automation)",
-      high: "3-5 (Action-heavy workflows)"
-    },
-    m365CopilotPrice: {
-      min: 25, max: 35, default: 30, step: 1,
-      low: "$25-27 (Negotiated discount)",
-      medium: "$28-32 (Standard pricing)",
-      high: "$33-35 (List price)"
-    },
-    autonomousActionRatio: {
-      min: 0, max: 50, default: 15, step: 5,
-      low: "0-10% (User-triggered only)",
-      medium: "10-20% (Some automation)",
-      high: "25-50% (Highly autonomous)"
-    }
-  };
-
-  // Calculate credits per conversation
-  const creditsPerConversation = useMemo(() => {
-    const classicTurns = config.turnsPerConversation * (1 - config.generativeRatio);
-    const generativeTurns = config.turnsPerConversation * config.generativeRatio;
-    const classicCredits = classicTurns * 1;
-    const generativeCredits = generativeTurns * 2;
-    const actionCredits = config.actionsPerConversation * 5;
-    return classicCredits + generativeCredits + actionCredits;
-  }, [config.turnsPerConversation, config.generativeRatio, config.actionsPerConversation]);
-
   // Linear interpolation between stages
   const interpolateValue = (month: number, stagesBefore: Stage[], stagesAfter: Stage[], getValue: (stage: Stage) => number): number => {
     const beforeStage = stagesBefore[stagesBefore.length - 1];
@@ -285,10 +225,12 @@ const CopilotCostCalculator: React.FC = () => {
     return beforeValue + (afterValue - beforeValue) * ratio;
   };
 
-  // Calculate monthly projections over 36 months
+  // Calculate monthly projections over 36 months (aggregated from all agents)
   const monthlyData = useMemo((): MonthlyData[] => {
     const data: MonthlyData[] = [];
-    const workingDaysPerMonth = 22;
+    const DAYS_PER_MONTH = 30;
+    const paygRate = 0.01;
+    const p3Discount = 0.15;
 
     for (let month = 1; month <= 36; month++) {
       // Find stages before and after this month
@@ -300,17 +242,51 @@ const CopilotCostCalculator: React.FC = () => {
       const dau = interpolateValue(month, stagesBefore, stagesAfter, s => s.dau);
       const activeUsers = Math.round(users * dau);
 
-      // Check if this is a peak month (every 6 months)
-      const isPeakMonth = month % 6 === 0;
-      const multiplier = isPeakMonth ? config.peakMultiplier : 1.0;
+      // Find current stage for segment calculations
+      const currentStage = [...stages].reverse().find(s => s.month <= month) || stages[0];
 
-      // Calculate conversations and credits
-      const conversations = activeUsers * config.conversationsPerDay * workingDaysPerMonth * multiplier;
-      const totalCredits = conversations * creditsPerConversation;
+      // Aggregate costs across all enabled agents
+      let totalConversations = 0;
+      let totalCredits = 0;
+      let totalActionsForM365 = 0; // For M365 hybrid model autonomous actions
 
-      // Pricing calculations
-      const paygRate = 0.01;
-      const p3Discount = 0.15;
+      agents.forEach(agent => {
+        // Only include enabled agents that have been deployed
+        if (!agent.enabled || month < agent.deployMonth) {
+          return;
+        }
+
+        // Determine eligible users based on agent segments
+        let eligibleUsers = 0;
+        if (agent.segments.includes('All')) {
+          eligibleUsers = users;
+        } else if (agent.segments.includes('Stores')) {
+          eligibleUsers = users;
+        } else if (agent.segments.includes('Management')) {
+          if (currentStage.phase === 'Management' || currentStage.phase === 'Stores' || currentStage.phase === 'Enterprise') {
+            eligibleUsers = users;
+          } else if (currentStage.phase === 'Expansion') {
+            eligibleUsers = Math.round(users * 0.4);
+          }
+        } else if (agent.segments.includes('HQ')) {
+          if (currentStage.phase === 'Pilot' || currentStage.phase === 'Expansion') {
+            eligibleUsers = users;
+          } else {
+            eligibleUsers = Math.round(users * 0.15);
+          }
+        }
+
+        // Calculate agent-specific metrics
+        const agentActiveUsers = Math.round(eligibleUsers * dau);
+        const agentConversations = agentActiveUsers * agent.conversationsPerDay * DAYS_PER_MONTH;
+        const agentCreditsPerConv = calculateAgentCredits(agent);
+        const agentCredits = agentConversations * agentCreditsPerConv;
+
+        // Accumulate totals
+        totalConversations += agentConversations;
+        totalCredits += agentCredits;
+        totalActionsForM365 += agentConversations * agent.actions; // Track actions for M365 model
+      });
 
       // Model 1: PAYG Alone
       const paygCost = totalCredits * paygRate;
@@ -318,23 +294,17 @@ const CopilotCostCalculator: React.FC = () => {
       // Model 2: P3 Pre-Purchase (15% discount)
       const p3Cost = totalCredits * paygRate * (1 - p3Discount);
 
-      // Model 3: PAYG + M365 Licenses (hybrid)
+      // Model 3 & 4: PAYG/P3 + M365 Licenses (hybrid)
       // M365 users only pay for autonomous actions
       const m365Users = Math.min(config.hybridM365Users, users);
       const paygUsers = users - m365Users;
-      const m365ActiveUsers = Math.round(m365Users * dau);
-      const paygActiveUsers = Math.round(paygUsers * dau);
 
-      const m365Conversations = m365ActiveUsers * config.conversationsPerDay * workingDaysPerMonth * multiplier;
-      const paygConversations = paygActiveUsers * config.conversationsPerDay * workingDaysPerMonth * multiplier;
-
-      // M365 users: only autonomous actions incur credits
-      const m365AutonomousCredits = m365Conversations * config.actionsPerConversation * config.autonomousActionRatio * 5;
-      const paygCredits = paygConversations * creditsPerConversation;
+      // Split credits proportionally between M365 and PAYG users
+      const userRatio = users > 0 ? paygUsers / users : 0;
+      const paygCredits = totalCredits * userRatio;
+      const m365AutonomousCredits = totalActionsForM365 * (1 - userRatio) * config.autonomousActionRatio * 5;
 
       const paygM365Cost = (m365Users * config.m365CopilotPrice) + ((m365AutonomousCredits + paygCredits) * paygRate);
-
-      // Model 4: P3 + M365 Licenses (hybrid with discount)
       const p3M365Cost = (m365Users * config.m365CopilotPrice) + ((m365AutonomousCredits + paygCredits) * paygRate * (1 - p3Discount));
 
       // Model 5: M365 Copilot for All
@@ -345,9 +315,9 @@ const CopilotCostCalculator: React.FC = () => {
         year: month <= 12 ? 'Year 1' : month <= 24 ? 'Year 2' : 'Year 3',
         users,
         dau,
-        dauPercent: dau * 100, // DAU as percentage for chart display
+        dauPercent: dau * 100,
         activeUsers,
-        conversations: Math.round(conversations),
+        conversations: Math.round(totalConversations),
         credits: Math.round(totalCredits),
         paygCost: Math.round(paygCost),
         p3Cost: Math.round(p3Cost),
@@ -358,7 +328,7 @@ const CopilotCostCalculator: React.FC = () => {
     }
 
     return data;
-  }, [stages, config, creditsPerConversation]);
+  }, [stages, agents, config]);
 
   // Calculate 3-year summary
   const pricingSummary = useMemo((): PricingSummary[] => {
@@ -864,94 +834,8 @@ const CopilotCostCalculator: React.FC = () => {
           )}
         </div>
 
-        {/* Parameter Sliders */}
+        {/* Advanced Settings Toggle */}
         <div className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Conversations per Day */}
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Conversations per Day per User: {config.conversationsPerDay}
-              </label>
-              <input
-                type="range"
-                min={parameterRanges.conversationsPerDay.min}
-                max={parameterRanges.conversationsPerDay.max}
-                step={parameterRanges.conversationsPerDay.step}
-                value={config.conversationsPerDay}
-                onChange={(e: ChangeEvent<HTMLInputElement>) => updateConfig('conversationsPerDay', parseFloat(e.target.value))}
-                className="w-full"
-              />
-              <div className="flex justify-between text-xs text-gray-500 mt-1">
-                <span>Low (1-2)</span>
-                <span>Medium (3-5)</span>
-                <span>High (6-12)</span>
-              </div>
-            </div>
-
-            {/* Turns per Conversation */}
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Turns per Conversation: {config.turnsPerConversation}
-              </label>
-              <input
-                type="range"
-                min={parameterRanges.turnsPerConversation.min}
-                max={parameterRanges.turnsPerConversation.max}
-                step={parameterRanges.turnsPerConversation.step}
-                value={config.turnsPerConversation}
-                onChange={(e: ChangeEvent<HTMLInputElement>) => updateConfig('turnsPerConversation', parseFloat(e.target.value))}
-                className="w-full"
-              />
-              <div className="flex justify-between text-xs text-gray-500 mt-1">
-                <span>Simple (2-3)</span>
-                <span>Normal (4-6)</span>
-                <span>Complex (7-10)</span>
-              </div>
-            </div>
-
-            {/* Generative AI Ratio */}
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Generative AI Ratio: {(config.generativeRatio * 100).toFixed(0)}%
-              </label>
-              <input
-                type="range"
-                min="0"
-                max="100"
-                value={config.generativeRatio * 100}
-                onChange={(e: ChangeEvent<HTMLInputElement>) => updateConfig('generativeRatio', parseInt(e.target.value) / 100)}
-                className="w-full"
-              />
-              <div className="flex justify-between text-xs text-gray-500 mt-1">
-                <span>Scripted (0-30%)</span>
-                <span>Balanced (40-60%)</span>
-                <span>AI-Driven (70-100%)</span>
-              </div>
-            </div>
-
-            {/* Actions per Conversation */}
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Actions per Conversation: {config.actionsPerConversation}
-              </label>
-              <input
-                type="range"
-                min="0"
-                max="5"
-                step="0.5"
-                value={config.actionsPerConversation}
-                onChange={(e: ChangeEvent<HTMLInputElement>) => updateConfig('actionsPerConversation', parseFloat(e.target.value))}
-                className="w-full"
-              />
-              <div className="flex justify-between text-xs text-gray-500 mt-1">
-                <span>Info only (0-1)</span>
-                <span>Some actions (1-2)</span>
-                <span>Heavy automation (3-5)</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Advanced Settings Toggle */}
           <button
             onClick={() => setShowAdvanced(!showAdvanced)}
             className="text-blue-600 hover:text-blue-800 font-medium"
@@ -1010,22 +894,6 @@ const CopilotCostCalculator: React.FC = () => {
                     max={30000}
                     value={config.hybridM365Users}
                     onChange={(e: ChangeEvent<HTMLInputElement>) => updateConfig('hybridM365Users', parseInt(e.target.value) || 0)}
-                    className="w-full p-2 border rounded bg-white"
-                  />
-                </div>
-
-                {/* Peak Multiplier */}
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Peak Multiplier (every 6 months)
-                  </label>
-                  <input
-                    type="number"
-                    min={1}
-                    max={2}
-                    step={0.1}
-                    value={config.peakMultiplier}
-                    onChange={(e: ChangeEvent<HTMLInputElement>) => updateConfig('peakMultiplier', parseFloat(e.target.value) || 1)}
                     className="w-full p-2 border rounded bg-white"
                   />
                 </div>
