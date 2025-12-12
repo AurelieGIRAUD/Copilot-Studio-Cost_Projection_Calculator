@@ -1,3 +1,7 @@
+# DISCLAIMER
+
+This tool provides indicative, non-binding cost estimates based on user inputs and publicly available Microsoft pricing. Actual pricing, terms, and usage costs may change at any time. Estimates are for informational purposes only and must be validated with official Microsoft documentation or an authorized representative. No guarantee of accuracy is provided, and no liability is accepted for decisions made based on these projections.
+
 # Copilot Studio Cost Projection Calculator
 
 Interactive 3-year cost projection calculator for Microsoft Copilot Studio. Compare 5 payments options with detailed scenario analysis.
