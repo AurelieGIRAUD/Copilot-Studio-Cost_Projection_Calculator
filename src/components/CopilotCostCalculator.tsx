@@ -844,6 +844,9 @@ const CopilotCostCalculator: React.FC = () => {
 
           {showAdvanced && (
             <div className="space-y-4 p-4 bg-gray-100 rounded-lg">
+              <p className="text-sm text-gray-700 mb-4">
+                Configure parameters for the M365 Copilot hybrid pricing models. These settings help accurately model scenarios where some users have M365 Copilot licenses while others use pay-as-you-go Copilot Studio.
+              </p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* M365 Copilot Price */}
                 <div>
@@ -880,6 +883,9 @@ const CopilotCostCalculator: React.FC = () => {
                     <span>Some automation (10-20%)</span>
                     <span>Highly autonomous (25-50%)</span>
                   </div>
+                  <p className="text-xs text-gray-600 mt-2">
+                    M365 Copilot licenses cover user-triggered actions, but autonomous (proactive) actions still cost credits. Typical range: 10-20%.
+                  </p>
                 </div>
 
                 {/* Hybrid M365 Users */}
