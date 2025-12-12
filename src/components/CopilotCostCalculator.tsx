@@ -670,10 +670,9 @@ const CopilotCostCalculator: React.FC = () => {
           Interactive 3-year cost projection with usage-based modeling and 5 pricing strategies
         </p>
 
-        <div className="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6">
-          <p className="text-sm text-blue-900">
-            <strong>Usage-Based Model:</strong> {creditsPerConversation.toFixed(1)} credits/conversation •
-            Classic turns (1 credit) • Generative turns (2 credits) • Actions (5 credits each)
+        <div className="bg-amber-50 border-l-4 border-amber-500 p-4 mb-6">
+          <p className="text-sm text-amber-900">
+            <strong>⚠️ Disclaimer:</strong> This tool provides indicative, non-binding cost estimates based on user inputs and publicly available Microsoft pricing. Actual pricing, terms, and usage costs may change at any time. Estimates are for informational purposes only and must be validated with official Microsoft documentation or an authorized representative. No guarantee of accuracy is provided, and no liability is accepted for decisions made based on these projections.
           </p>
         </div>
 
