@@ -1,6 +1,6 @@
 # Copilot Studio Cost Projection Calculator
 
-Interactive 2-year cost projection calculator for Microsoft Copilot Studio. Compare pay-as-you-go pricing vs M365 Copilot licensing with detailed scenario analysis.
+Interactive 3-year cost projection calculator for Microsoft Copilot Studio. Compare 5 payments options with detailed scenario analysis.
 
 ## Features
 
