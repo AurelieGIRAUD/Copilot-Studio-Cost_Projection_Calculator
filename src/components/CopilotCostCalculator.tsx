@@ -817,8 +817,7 @@ const CopilotCostCalculator: React.FC = () => {
               {stages.map((stage, idx) => (
                 <div key={idx} className="grid grid-cols-1 md:grid-cols-3 gap-3 items-center p-3 bg-gray-50 rounded">
                   <div>
-                    <span className="text-xs font-semibold text-gray-600">Month {stage.month}</span>
-                    <div className="font-semibold text-gray-900">{stage.name}</div>
+                    <span className="text-sm font-semibold text-gray-900">Month {stage.month}</span>
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-700 mb-1">
